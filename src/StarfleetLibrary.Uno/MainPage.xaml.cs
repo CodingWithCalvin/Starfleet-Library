@@ -73,6 +73,7 @@ public sealed partial class MainPage : Page
     {
         var compact = ActualWidth < 1000;
         SidebarColumn.Width = new(compact ? 80 : 224);
+        BrandLogo.Width = BrandLogo.Height = compact ? 48 : 72;
         BrandWords.Visibility = SidebarFooter.Visibility = SettingsWords.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
         foreach (var nav in navigation) nav.Label.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
         Workspace.Margin = new(ActualWidth < 760 ? 16 : 32, 24, ActualWidth < 760 ? 16 : 32, 20);
