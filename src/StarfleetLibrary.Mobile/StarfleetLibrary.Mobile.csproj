@@ -1,7 +1,8 @@
 <Project Sdk="Uno.Sdk/6.7.45">
   <PropertyGroup>
-    <TargetFrameworks>net10.0-browserwasm</TargetFrameworks>
-    <TargetFrameworks Condition="'$(EnableIos)' == 'true'">net10.0-browserwasm;net10.0-ios</TargetFrameworks>
+    <TargetFrameworks>net10.0-ios</TargetFrameworks>
+    <TargetFrameworks Condition="'$(MobileWindowsPreview)' == 'true'">net10.0-windows10.0.26100</TargetFrameworks>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
 
     <OutputType>Exe</OutputType>
     <UnoSingleProject>true</UnoSingleProject>
@@ -23,7 +24,14 @@
       https://aka.platform.uno/singleproject-features
     -->
     <UnoFeatures>
+      Toolkit;
     </UnoFeatures>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(MobileWindowsPreview)' == 'true'">
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
   </PropertyGroup>
 
   <ItemGroup>

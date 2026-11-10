@@ -7,7 +7,8 @@ namespace StarfleetLibrary.Mobile;
 
 public sealed class MobileStore
 {
-    private const string StateKey = "starfleet.mobile.catalog.v1";
+    private static string Root => Path.Combine(ApplicationData.Current.LocalFolder.Path,"NativeLibrary");
+    private static string StatePath => Path.Combine(Root,"catalog-and-sync.json");
     private DeviceState state = new([], [], null);
     private readonly SemaphoreSlim gate = new(1,1);
     public Book[] Books => state.Books.Select(b => b with { }).ToArray();
@@ -20,8 +21,8 @@ public sealed class MobileStore
     {
         try
         {
-            if (ApplicationData.Current.LocalSettings.Values.TryGetValue(StateKey,out var value) && value is string json)
-                state = JsonSerializer.Deserialize(json,SyncJson.Context.DeviceState) ?? throw new InvalidDataException("Empty saved catalog.");
+            if (File.Exists(StatePath))
+                state = JsonSerializer.Deserialize(File.ReadAllText(StatePath),SyncJson.Context.DeviceState) ?? throw new InvalidDataException("Empty saved catalog.");
             _ = CatalogBackup.Encode(state.Books);
         }
         catch (Exception ex) { LoadError = "The saved catalog could not be opened. It has been preserved. " + ex.Message; }
@@ -30,8 +31,9 @@ public sealed class MobileStore
     {
         if (LoadError is not null) throw new InvalidOperationException(LoadError);
         _ = CatalogBackup.Encode(next.Books);
-        // A single local-storage value commits books and sync baseline together.
-        ApplicationData.Current.LocalSettings.Values[StateKey] = JsonSerializer.Serialize(next,SyncJson.Context.DeviceState);
+        Directory.CreateDirectory(Root);
+        File.WriteAllText(StatePath+".tmp",JsonSerializer.Serialize(next,SyncJson.Context.DeviceState));
+        File.Move(StatePath+".tmp",StatePath,true);
         state = next;
     }
     public async Task SaveAsync(Book book, Book? expected = null)
@@ -62,6 +64,14 @@ public sealed class MobileStore
             var result = await new SyncClient(http).SynchronizeAsync(state.Books,state.Baseline);
             Persist(new(result.Books,result.Baseline,DateTimeOffset.UtcNow));
             Conflicts = result.Conflicts;
+            Directory.CreateDirectory(Path.Combine(Root,"covers"));
+            foreach(var entry in result.Baseline.Where(x=>x.Book is not null && x.Cover is not null))
+            {
+                var file=Path.Combine(Root,"covers",entry.Cover+".jpg");
+                if(File.Exists(file))continue;
+                var bytes=await http.GetByteArrayAsync("api/covers/"+entry.Cover);
+                await File.WriteAllBytesAsync(file+".tmp",bytes);File.Move(file+".tmp",file,true);
+            }
         }
         finally { gate.Release(); }
     }
@@ -76,5 +86,11 @@ public sealed class MobileStore
             Conflicts = Conflicts.Where(c=>c.Id != conflict.Id).ToArray();
         }
         finally { gate.Release(); }
+    }
+    public string? CoverFile(Guid id)
+    {
+        if(Cover(id) is not { } hash)return null;
+        var file=Path.Combine(Root,"covers",hash+".jpg");
+        return File.Exists(file) ? new Uri(file).AbsoluteUri : null;
     }
 }

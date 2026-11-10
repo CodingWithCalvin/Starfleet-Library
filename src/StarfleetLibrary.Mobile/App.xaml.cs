@@ -76,9 +76,7 @@ public partial class App : Application
 
         var factory = LoggerFactory.Create(builder =>
         {
-#if __WASM__
-            builder.AddProvider(new global::Uno.Extensions.Logging.WebAssembly.WebAssemblyConsoleLoggerProvider());
-#elif __IOS__
+#if __IOS__
             builder.AddProvider(new global::Uno.Extensions.Logging.OSLogLoggerProvider());
 
             // Log to the Visual Studio Debug console

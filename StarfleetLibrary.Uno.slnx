@@ -9,5 +9,6 @@
     <Project Path="tests/StarfleetLibrary.Core.Tests/StarfleetLibrary.Core.Tests.csproj" />
     <Project Path="tests/StarfleetLibrary.Uno.Tests/StarfleetLibrary.Uno.Tests.csproj" />
     <Project Path="tests/StarfleetLibrary.Sync.Tests/StarfleetLibrary.Sync.Tests.csproj" />
+    <Project Path="tests/StarfleetLibrary.PrivateSync.Tests/StarfleetLibrary.PrivateSync.Tests.csproj" />
   </Folder>
 </Solution>

@@ -23,7 +23,7 @@ public sealed class UnoLibraryStore
     public event Action? Changed;
     public SyncConflict[] SyncConflicts { get; private set; } = [];
     public DateTimeOffset? LastSync { get; private set; }
-    private string SyncStatePath => Path.Combine(Root,"sync-baseline.json");
+    private string SyncStatePath => Path.Combine(Root,"private-sync-baseline.json");
     public static string DefaultRoot => Environment.GetEnvironmentVariable("STARFLEET_UNO_DATA_DIR")
         ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Starfleet Library Uno");
 

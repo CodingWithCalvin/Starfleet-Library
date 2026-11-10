@@ -16,8 +16,6 @@ public sealed record DeviceState(Book[] Books, SyncEntry[] Baseline, DateTimeOff
 // so independent edits merge and deletions remain visible to offline devices.
 public sealed class SyncClient(HttpClient http)
 {
-    public const string HostedUrl = "https://starfleet-library-calvin.speedykazoo2.chatgpt.site/";
-
     public async Task<SyncResult> SynchronizeAsync(IReadOnlyList<Book> books, IReadOnlyList<SyncEntry> baseline,
         IReadOnlyDictionary<Guid, string>? covers = null, CancellationToken cancellationToken = default)
     {
@@ -38,6 +36,8 @@ public sealed class SyncClient(HttpClient http)
             // not a deletion. Never propagate it into the local library.
             if (theirs is null && before is not null)
                 throw new InvalidDataException("The hosted catalog has been reset. Your local books are preserved; reconnect before syncing.");
+            if (theirs is not null && before is not null && theirs.Revision < before.Revision)
+                throw new InvalidDataException("The service returned an older catalog revision. Your local books are preserved.");
             var cover = covers?.GetValueOrDefault(id) ?? before?.Cover;
             var localChanged = mine != before?.Book || (mine is not null && cover != before?.Cover);
             var remoteChanged = theirs?.Revision != before?.Revision;

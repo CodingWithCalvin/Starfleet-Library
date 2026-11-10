@@ -24,13 +24,9 @@ public sealed partial class MainPage : Page
     {
         InitializeComponent();
         store = new();
-        var origin = SyncClient.HostedUrl;
-#if __WASM__
-        origin = global::Uno.Foundation.WebAssemblyRuntime.InvokeJS("window.location.origin + '/' ");
-#endif
-        http = new() { BaseAddress = new Uri(origin), Timeout = TimeSpan.FromSeconds(25) };
+        http = new() { Timeout = TimeSpan.FromSeconds(25) };
         Loaded += async (_,_) => { ShowShelf(); await SyncAsync(); timer.Start(); };
-        timer.Tick += async (_,_) => { if (!editing && scanPoll is null) await SyncAsync(); };
+        timer.Tick += async (_,_) => { if (!editing && !scanning) await SyncAsync(); };
     }
 
     private async Task SyncAsync()
@@ -40,20 +36,20 @@ public sealed partial class MainPage : Page
         SyncStatus.Content = "Syncing your library…";
         try
         {
-            await store.SyncAsync(http);
-#if __WASM__
-            var paths=store.Books.Select(b=>store.Cover(b.Id)).Where(x=>x is not null).Distinct().Select(x=>"/api/covers/"+x).ToArray();
-            var serializedPaths="["+string.Join(",",paths.Select(x=>"\""+x+"\""))+"]";
-            global::Uno.Foundation.WebAssemblyRuntime.InvokeJS("window.starfleetOffline?.warm("+serializedPaths+")");
-#endif
+            var settings=await Services.PrivateConnection.ReadAsync();
+            if(settings is null){SyncStatus.Content="Pair your private library · Tap to connect";return;}
+            using var privateHttp=settings.CreateClient();
+            await store.SyncAsync(privateHttp);
             SyncStatus.Content = store.Conflicts.Length > 0 ? $"{store.Conflicts.Length} changes need review · Tap here" : $"Synced {DateTime.Now:t} · Catalog saved here";
-            if (!editing && !detail && scanPoll is null) Refresh();
+            if (!editing && !detail && !scanning) Refresh();
         }
         catch { SyncStatus.Content = store.LastSync is not null ? "Offline · Changes saved here · Tap to retry" : "Connect to load your library · Tap to retry"; }
         finally { syncing = false; }
     }
     private async void SyncClicked(object sender,RoutedEventArgs e)
     {
+        try { if(await Services.PrivateConnection.ReadAsync() is null){await PairLibraryAsync();return;} }
+        catch(Exception ex){await Message(ex.Message);return;}
         if (store.Conflicts.Length == 0) { await SyncAsync(); return; }
         foreach (var conflict in store.Conflicts.ToArray())
         {
@@ -117,7 +113,7 @@ public sealed partial class MainPage : Page
         count!.Text=$"{books.Length} {(books.Length==1 ? "edition" : "editions")} · {(shelf==OwnershipStatus.Owned ? "on your shelves" : "to look out for")}";
         empty!.Text=books.Length==0 ? query.Length>0 || format>0 ? "No matching editions.\nTry another search or filter." : shelf==OwnershipStatus.Wishlist ? "Your next adventure starts here.\nTap + Add to save a book for later." : store.LastSync is null ? "Your library will appear after the first sync." : "No editions in this view.\nTap + Add or change the filters." : "";
     }
-    private string? CoverUrl(Book book) => store.Cover(book.Id) is { } hash ? new Uri(http.BaseAddress!,"api/covers/"+hash).AbsoluteUri : BookCover.Source(book)?.AbsoluteUri;
+    private string? CoverUrl(Book book) => store.CoverFile(book.Id);
     private void ShowDetail(Book stale)
     {
         var book=store.Books.FirstOrDefault(x=>x.Id==stale.Id) ?? stale;
@@ -171,7 +167,7 @@ public sealed partial class MainPage : Page
     private async Task<bool> Save(Book book,Book expected){try{await store.SaveAsync(book,expected);await SyncAsync();return true;}catch(Exception ex){await Message(ex.Message);return false;}}
     private StackPanel PagePanel(string back,RoutedEventHandler action)
     {
-        Body.Children.Clear();Body.RowDefinitions.Clear();var panel=new StackPanel { Spacing=14,Margin=new(0,0,0,24) };panel.Children.Add(Btn("‹  "+back,action));Body.Children.Add(new ScrollViewer { Content=panel,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled });return panel;
+        Body.Children.Clear();Body.RowDefinitions.Clear();var panel=new StackPanel { Spacing=14,Margin=new(0,0,0,24) };panel.Children.Add(Btn("‹  "+back,action));var scroll=new ScrollViewer { Content=panel,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled };global::Uno.Toolkit.UI.SafeArea.SetInsets(scroll,global::Uno.Toolkit.UI.SafeArea.InsetMask.SoftInput);Body.Children.Add(scroll);return panel;
     }
     private async Task<bool> Confirm(string title,string text,string action)=>await new ContentDialog { XamlRoot=XamlRoot,Title=title,Content=Txt(text),PrimaryButtonText=action,CloseButtonText="Cancel" }.ShowAsync()==ContentDialogResult.Primary;
     private async Task Message(string text)=>await new ContentDialog { XamlRoot=XamlRoot,Title="Could not save",Content=Txt(text),CloseButtonText="OK" }.ShowAsync();

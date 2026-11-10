@@ -1,0 +1,79 @@
+name: Native iPhone
+on:
+  workflow_dispatch:
+    inputs:
+      signed:
+        description: Build a signed iPhone IPA (requires Apple signing secrets)
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths: ['src/**', '.github/workflows/ios.yml', 'global.json', 'Directory.Build.props']
+permissions:
+  contents: read
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.100'
+      - name: Select compatible Xcode and iOS workload
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.0.1.app
+          dotnet workload install ios --version 10.0.100
+          xcodebuild -version
+      - name: Build native simulator app
+        if: ${{ !inputs.signed }}
+        run: dotnet build src/StarfleetLibrary.Mobile/StarfleetLibrary.Mobile.csproj -c Release -f net10.0-ios -r iossimulator-arm64 -p:EnableCodeSigning=false
+      - name: Install signing identity
+        if: ${{ inputs.signed }}
+        env:
+          CERTIFICATE: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          PROFILE: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
+        run: |
+          test -n "$CERTIFICATE" && test -n "$PROFILE" && test -n "$KEYCHAIN_PASSWORD"
+          printf '%s' "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          printf '%s' "$PROFILE" | base64 --decode > "$RUNNER_TEMP/profile.mobileprovision"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/build.keychain-db"
+          security set-keychain-settings -lut 21600 "$RUNNER_TEMP/build.keychain-db"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/build.keychain-db"
+          security import "$RUNNER_TEMP/signing.p12" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$RUNNER_TEMP/build.keychain-db"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/build.keychain-db"
+          security list-keychains -d user -s "$RUNNER_TEMP/build.keychain-db"
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$RUNNER_TEMP/profile.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/build.mobileprovision"
+      - name: Build signed iPhone app
+        if: ${{ inputs.signed }}
+        env:
+          SIGNING_IDENTITY: ${{ secrets.IOS_SIGNING_IDENTITY }}
+          PROFILE_NAME: ${{ secrets.IOS_PROFILE_NAME }}
+        run: dotnet publish src/StarfleetLibrary.Mobile/StarfleetLibrary.Mobile.csproj -c Release -f net10.0-ios -r ios-arm64 -p:BuildIpa=true -p:ArchiveOnBuild=true -p:CodesignKey="$SIGNING_IDENTITY" -p:CodesignProvision="$PROFILE_NAME"
+      - name: Package simulator application
+        if: ${{ !inputs.signed }}
+        run: |
+          mkdir -p artifacts
+          APP=$(find src/StarfleetLibrary.Mobile/bin/Release/net10.0-ios/iossimulator-arm64 -maxdepth 1 -name '*.app' -print -quit)
+          test -n "$APP"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" artifacts/StarfleetLibrary-Simulator.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-iphone-build
+          path: |
+            artifacts/*.zip
+            src/StarfleetLibrary.Mobile/bin/Release/net10.0-ios/ios-arm64/publish/*.ipa
+            src/StarfleetLibrary.Mobile/bin/Release/net10.0-ios/ios-arm64/*.ipa
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove temporary signing material
+        if: ${{ always() && inputs.signed }}
+        run: |
+          security delete-keychain "$RUNNER_TEMP/build.keychain-db" || true
+          rm -f "$RUNNER_TEMP/signing.p12" "$RUNNER_TEMP/profile.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/build.mobileprovision"

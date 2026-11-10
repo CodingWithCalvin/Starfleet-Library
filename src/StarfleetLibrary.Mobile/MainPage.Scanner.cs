@@ -4,33 +4,21 @@ namespace StarfleetLibrary.Mobile;
 
 public sealed partial class MainPage
 {
-    private DispatcherTimer? scanPoll;
+    private bool scanning;
     private async void ScanClicked(object sender,RoutedEventArgs e)
     {
-#if __WASM__
         if(!await LeaveEditor())return;
-        // The scanner is a browser overlay outside Uno's DOM tree. Disable the
-        // underlying page so Uno's document-level pointer routing cannot also
-        // open a book beneath a camera/photo button.
-        IsEnabled=false;
-        global::Uno.Foundation.WebAssemblyRuntime.InvokeJS("window.starfleetScanner.open()");
-        var poll=scanPoll=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(250) };
-        poll.Tick+=async (_,_)=>
+        if(scanning)return;
+        scanning=true;
+        try
         {
-            var value=global::Uno.Foundation.WebAssemblyRuntime.InvokeJS("window.starfleetScanner.take()");
-            if(value=="__waiting__")return;
-            poll.Stop();
-            scanPoll=null;
-            IsEnabled=true;
-            if(value.Length==0)return;
+            var value=await Services.NativeScanner.ScanAsync();
+            if(string.IsNullOrWhiteSpace(value))return;
             if(value=="manual"){ShowEditor(new Book { Ownership=shelf },true);return;}
             await ShowScannedAsync(value);
-        };
-        poll.Start();
-#else
-        await Message("Camera scanning is available in the iPhone Home Screen app. You can also enter an ISBN below.");
-        ShowEditor(new Book { Ownership=shelf },true);
-#endif
+        }
+        catch(Exception ex){await Message(ex.Message);ShowEditor(new Book { Ownership=shelf },true);}
+        finally{scanning=false;}
     }
     private async Task ShowScannedAsync(string value)
     {

@@ -4,6 +4,8 @@
 	<dict>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
+		<key>NSCameraUsageDescription</key>
+		<string>Scan book ISBN and UPC barcodes to check your collection and wishlist. Camera images stay on your iPhone.</string>
 		<key>UIDeviceFamily</key>
 		<array>
 			<integer>1</integer>
@@ -11,7 +13,6 @@
 		</array>
 		<key>UIRequiredDeviceCapabilities</key>
 		<array>
-			<string>armv7</string>
 			<string>arm64</string>
 		</array>
 		<key>UISupportedInterfaceOrientations</key>

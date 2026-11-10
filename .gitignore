@@ -17,3 +17,7 @@ dist/
 .env*
 .sites/
 outputs/
+.dev.vars*
+*.p8
+*.pfx
+*.secrets.json
