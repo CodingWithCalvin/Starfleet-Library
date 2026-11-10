@@ -1,0 +1,35 @@
+name: Windows desktop
+on:
+  push:
+    branches: [main]
+    paths: ['src/**', 'tests/**', '.github/workflows/windows.yml', 'global.json', 'Directory.Build.props']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build Windows desktop
+        run: dotnet build src/StarfleetLibrary.Uno/StarfleetLibrary.Uno.csproj -c Release
+      - name: Validate catalog, storage and encrypted sync
+        shell: pwsh
+        run: |
+          foreach ($suite in 'Core','Uno','Sync','PrivateSync') {
+            dotnet run --project "tests/StarfleetLibrary.$suite.Tests/StarfleetLibrary.$suite.Tests.csproj" -c Release
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Starfleet-Library-Windows
+          path: src/StarfleetLibrary.Uno/bin/Release/net10.0-windows10.0.26100/win-x64/
+          if-no-files-found: error
+          retention-days: 14

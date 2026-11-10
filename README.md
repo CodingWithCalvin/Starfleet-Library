@@ -4,6 +4,8 @@ A personal Star Trek library with **native Uno Platform Windows and iPhone apps*
 
 This standalone project lives at `D:\coding-with-calvin\StarfleetLibraryUno`. All app code, core code, tests, assets and build configuration are included here. It has no project or build dependency on `StarfleetLibraryMaui`.
 
+The public repository is [CodingWithCalvin/Starfleet-Library](https://github.com/CodingWithCalvin/Starfleet-Library). The Windows desktop application is in `src/StarfleetLibrary.Uno`; the native iPhone application is in `src/StarfleetLibrary.Mobile`. GitHub Actions builds both apps and tests the private sync service. Download the **Starfleet-Library-Windows** artifact from a successful **Windows desktop** run to get the desktop application.
+
 ## Run
 
 Double-click **Launch Uno.cmd**. The launcher builds the Release app if it has not been built yet.
