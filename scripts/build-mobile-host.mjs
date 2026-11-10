@@ -37,7 +37,7 @@ await writeFile('dist/client/index.html',html);
 const files=[];
 async function walk(directory){for(const item of await readdir(directory,{withFileTypes:true})){const name=path.join(directory,item.name);if(item.isDirectory())await walk(name);else if(item.name !== 'service-worker.js')files.push('/'+path.relative('dist/client',name).replaceAll('\\','/'));}}
 await walk('dist/client');
-const version=createHash('sha256').update(await readFile('src/StarfleetLibrary.Mobile/bin/Release/net10.0-browserwasm/StarfleetLibrary.Mobile.dll')).update(JSON.stringify(files)).digest('hex').slice(0,16);
 const template=await readFile('host/service-worker.js','utf8');
+const version=createHash('sha256').update(await readFile('src/StarfleetLibrary.Mobile/bin/Release/net10.0-browserwasm/StarfleetLibrary.Mobile.dll')).update(template).update(JSON.stringify(files)).digest('hex').slice(0,16);
 await writeFile('dist/client/service-worker.js',template.replace('__VERSION__',version).replace('__FILES__',JSON.stringify(files)));
 console.log(`Prepared Uno mobile app: ${files.length} files, private D1 catalog, R2 covers.`);
