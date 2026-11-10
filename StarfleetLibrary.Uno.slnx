@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/StarfleetLibrary.Core/StarfleetLibrary.Core.csproj" />
+    <Project Path="src/StarfleetLibrary.Sync/StarfleetLibrary.Sync.csproj" />
+    <Project Path="src/StarfleetLibrary.Mobile/StarfleetLibrary.Mobile.csproj" />
+    <Project Path="src/StarfleetLibrary.Uno/StarfleetLibrary.Uno.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/StarfleetLibrary.Core.Tests/StarfleetLibrary.Core.Tests.csproj" />
+    <Project Path="tests/StarfleetLibrary.Uno.Tests/StarfleetLibrary.Uno.Tests.csproj" />
+    <Project Path="tests/StarfleetLibrary.Sync.Tests/StarfleetLibrary.Sync.Tests.csproj" />
+  </Folder>
+</Solution>

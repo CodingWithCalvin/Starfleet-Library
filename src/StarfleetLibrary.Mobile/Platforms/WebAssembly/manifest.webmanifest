@@ -1,0 +1,10 @@
+{
+  "background_color": "#101D32",
+  "description": "Your Star Trek Collection and Wishlist, wherever you explore.",
+  "display": "standalone",
+  "name": "Starfleet Library",
+  "short_name": "Starfleet",
+  "start_url": "/index.html",
+  "theme_color": "#101D32",
+  "scope": "/"
+}

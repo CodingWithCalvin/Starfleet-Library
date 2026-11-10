@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "books": [
+    {
+      "id": "B62B2FD4-70FB-4C5F-8DF7-167C70FC5C42",
+      "title": "Legacy Test Edition",
+      "authors": "Example Author",
+      "series": "deepSpaceNine",
+      "bookNumber": "12",
+      "isbn": "0-306-40615-2",
+      "publisher": "Example Publisher",
+      "publicationYear": "2000",
+      "edition": "Second printing",
+      "format": "hardcover",
+      "ownership": "owned",
+      "readingStatus": "finished",
+      "pageCount": 256,
+      "currentPage": 256,
+      "rating": 4,
+      "notes": "Synthetic migration fixture: café, Q’s notes.\nSecond line.",
+      "addedAt": "2026-01-02T03:04:05Z",
+      "finishedAt": "2026-06-07T08:09:10Z",
+      "coverURL": "https://example.invalid/legacy-cover.jpg"
+    },
+    {
+      "id": "8507D4B8-4232-4617-BB9E-7A72F4C1C4EC",
+      "title": "Legacy Wish List",
+      "authors": "Another Author",
+      "series": "nextGeneration",
+      "bookNumber": "",
+      "isbn": "",
+      "publisher": "",
+      "publicationYear": "",
+      "edition": "Digital edition",
+      "format": "ebook",
+      "ownership": "wishlist",
+      "readingStatus": "unread",
+      "pageCount": 0,
+      "currentPage": 0,
+      "rating": 0,
+      "notes": "Optional Swift fields are intentionally omitted.",
+      "addedAt": "2026-02-03T04:05:06Z"
+    }
+  ]
+}
