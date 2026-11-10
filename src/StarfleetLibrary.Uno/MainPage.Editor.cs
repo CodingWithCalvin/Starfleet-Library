@@ -109,7 +109,7 @@ public sealed partial class MainPage
                     scroll.ChangeView(null, 0, null);
                     return;
                 }
-                await store.SaveAsync(book);
+                await store.SaveAsync(book, isNew ? null : original);
                 saved = book;
                 args.Cancel = false;
             }

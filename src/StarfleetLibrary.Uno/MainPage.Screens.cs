@@ -43,12 +43,12 @@ public sealed partial class MainPage
         var save = ActionButton("Save progress", async (_, _) =>
         {
             if (double.IsNaN(progress.Value) || progress.Value != Math.Truncate(progress.Value)) { ShowNotice("Enter a whole page number.", true); return; }
-            await SaveAndShowAsync(book with { CurrentPage = (int)progress.Value, ReadingStatus = progress.Value > 0 ? ReadingStatus.Reading : ReadingStatus.Unread, FinishedAt = null });
+            await SaveAndShowAsync(book with { CurrentPage = (int)progress.Value, ReadingStatus = progress.Value > 0 ? ReadingStatus.Reading : ReadingStatus.Unread, FinishedAt = null }, book);
         });
         var finish = ActionButton(book.ReadingStatus == ReadingStatus.Finished ? "Mark unread" : "Mark finished", async (_, _) =>
             await SaveAndShowAsync(book.ReadingStatus == ReadingStatus.Finished
                 ? book with { ReadingStatus = ReadingStatus.Unread, CurrentPage = 0, FinishedAt = null }
-                : book with { ReadingStatus = ReadingStatus.Finished, CurrentPage = book.PageCount > 0 ? book.PageCount : book.CurrentPage, FinishedAt = DateTimeOffset.Now }));
+                : book with { ReadingStatus = ReadingStatus.Finished, CurrentPage = book.PageCount > 0 ? book.PageCount : book.CurrentPage, FinishedAt = DateTimeOffset.Now }, book));
         save.IsEnabled = finish.IsEnabled = !store.IsReadOnly;
         actions.Children.Add(save); actions.Children.Add(finish); reading.Children.Add(actions);
         if (book.Rating > 0) reading.Children.Add(Text(new string('★', book.Rating) + new string('☆', 5 - book.Rating), 22, "#B97A18"));
@@ -76,7 +76,7 @@ public sealed partial class MainPage
         var delete = ActionButton("Remove from library", async (_, _) =>
         {
             if (!await ConfirmAsync("Remove this edition?", $"Remove “{book.Title}” and its reading log from this Uno library?", "Remove")) return;
-            try { await store.DeleteAsync(book.Id); rows.Remove(book.Id); Navigate(section); ShowNotice("Edition removed."); }
+            try { await store.DeleteAsync(book.Id, book); rows.Remove(book.Id); Navigate(section); ShowNotice("Edition removed."); }
             catch (Exception ex) { ShowNotice(ex.Message, true); }
         });
         delete.IsEnabled = !store.IsReadOnly;
@@ -96,9 +96,9 @@ public sealed partial class MainPage
         return panel;
     }
 
-    private async Task SaveAndShowAsync(Book book)
+    private async Task SaveAndShowAsync(Book book, Book expected)
     {
-        try { await store.SaveAsync(book); ShowDetail(book); ShowNotice("Reading log updated."); }
+        try { await store.SaveAsync(book, expected); ShowDetail(book); ShowNotice("Reading log updated."); }
         catch (Exception ex) { ShowNotice(ex.Message, true); }
     }
 

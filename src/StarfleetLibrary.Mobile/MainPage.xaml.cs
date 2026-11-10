@@ -128,14 +128,15 @@ public sealed partial class MainPage : Page
         if (CoverUrl(book) is { } cover) image.Source=new BitmapImage(new Uri(cover));panel.Children.Add(image);
         panel.Children.Add(Txt(book.CatalogLabel(),12,"#147077",true));panel.Children.Add(Txt(book.Title,26,"#17243B",true));panel.Children.Add(Txt(book.Authors,16));
         panel.Children.Add(Txt($"{book.Format.DisplayName()} · {book.Ownership.DisplayName()}",16,"#147077",true));
-        if (book.Ownership==OwnershipStatus.Wishlist) panel.Children.Add(Btn("I bought this · Move to Collection",async (_,_)=>{await Save(book with { Ownership=OwnershipStatus.Owned });shelf=OwnershipStatus.Owned;ShowDetail(book with { Ownership=OwnershipStatus.Owned });},true));
+        if (book.Ownership==OwnershipStatus.Wishlist) panel.Children.Add(Btn("I bought this · Move to Collection",async (_,_)=>{if(await Save(book with { Ownership=OwnershipStatus.Owned },book)){shelf=OwnershipStatus.Owned;ShowDetail(book with { Ownership=OwnershipStatus.Owned });}},true));
         panel.Children.Add(Btn("Edit edition",(_,_)=>ShowEditor(book,false)));
         panel.Children.Add(Txt(string.Join("\n",new[]{book.Isbn.Length>0 ? "ISBN "+book.Isbn : "",book.Publisher,book.PublicationYear,book.Edition}.Where(x=>x.Length>0))));
         if(book.Notes.Length>0) {panel.Children.Add(Txt("Notes",16,"#17243B",true));panel.Children.Add(Txt(book.Notes));}
-        panel.Children.Add(Btn("Remove this edition",async (_,_)=>{if(await Confirm("Remove this edition?",book.Title,"Remove")){try{await store.DeleteAsync(book.Id);ShowShelf();await SyncAsync();}catch(Exception ex){await Message(ex.Message);}}}));
+        panel.Children.Add(Btn("Remove this edition",async (_,_)=>{if(await Confirm("Remove this edition?",book.Title,"Remove")){try{await store.DeleteAsync(book.Id,book);ShowShelf();await SyncAsync();}catch(Exception ex){await Message(ex.Message);}}}));
     }
     private void ShowEditor(Book original,bool isNew)
     {
+        var expected = isNew ? null : original with { };
         editing=true;detail=false;Heading.Text=isNew ? "Add an edition" : "Edit edition";
         var panel=PagePanel("Cancel",async (_,_)=>{if(await LeaveEditor())ShowShelf();});
         var isbn=Field(panel,"ISBN (optional)",original.Isbn);var title=Field(panel,"Title",original.Title);var authors=Field(panel,"Author(s)",original.Authors);
@@ -164,10 +165,10 @@ public sealed partial class MainPage : Page
             if(book.ValidationError is { } error){status.Text=error;return;}
             var duplicates=CatalogMatcher.ExactMatches(book.Isbn,store.Books).Where(b=>b.Id!=book.Id).ToArray();
             if(duplicates.Length>0 && !await Confirm("Another copy is already saved",string.Join("\n",duplicates.Select(b=>$"{b.Title} · {b.Format.DisplayName()} · {b.Ownership.DisplayName()}")),"Save separate copy"))return;
-            try{await store.SaveAsync(book);editing=false;shelf=book.Ownership;ShowDetail(book);await SyncAsync();}catch(Exception ex){status.Text=ex.Message;}
+            try{await store.SaveAsync(book,expected);editing=false;shelf=book.Ownership;ShowDetail(book);await SyncAsync();}catch(Exception ex){status.Text=ex.Message;}
         },true));
     }
-    private async Task Save(Book book){try{await store.SaveAsync(book);await SyncAsync();}catch(Exception ex){await Message(ex.Message);}}
+    private async Task<bool> Save(Book book,Book expected){try{await store.SaveAsync(book,expected);await SyncAsync();return true;}catch(Exception ex){await Message(ex.Message);return false;}}
     private StackPanel PagePanel(string back,RoutedEventHandler action)
     {
         Body.Children.Clear();Body.RowDefinitions.Clear();var panel=new StackPanel { Spacing=14,Margin=new(0,0,0,24) };panel.Children.Add(Btn("‹  "+back,action));Body.Children.Add(new ScrollViewer { Content=panel,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled });return panel;

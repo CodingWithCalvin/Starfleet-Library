@@ -4,7 +4,7 @@ The mobile app is an actual Uno C#/XAML WebAssembly application in `src/Starflee
 
 ## On iPhone
 
-Open the private companion URL in Safari, sign in with the owning ChatGPT account, then use **Share → Add to Home Screen**. Let the first online sync finish before shopping. Catalog data is saved on the phone; the app shell and hosted cover images are cached for offline use. Browser/OS storage clearing can remove the local copy, so reopen online to download it again.
+Open [Starfleet Library](https://starfleet-library-calvin.speedykazoo2.chatgpt.site) in Safari, sign in with the owning ChatGPT account, then use **Share → Add to Home Screen**. Let the first online sync finish before shopping. Catalog data is saved on the phone; the app shell and hosted cover images are cached for offline use. Browser/OS storage clearing can remove the local copy, so reopen online to download it again.
 
 Search checks titles, authors, ISBNs and series labels. Filters include books/comics and edition formats. Cover view preserves the colored format ribbons. Wishlist entries have **I bought this → Move to Collection**. Editing an edition preserves desktop-only reading metadata.
 
@@ -26,7 +26,7 @@ The desktop's service credential is Windows-user encrypted in `sync-access.bin`,
 
 Books retain their existing GUIDs. Each edition has an independent server revision. Writes use an atomic compare-and-set; removed editions retain a tombstone. An offline device compares its current books with its previous server snapshot. Independent changes merge. Conflicting edits stay local and are presented for review, with explicit choices for this device or the other version. A missing server revision is treated as a service reset, never as permission to erase a local catalog.
 
-The desktop saves a catalog backup before its first sync. Catalog and baseline writes are ordered so interruption produces a recoverable retry or conflict rather than data loss. Sync runs on launch, after local changes, and every 45 seconds while open. Failed sync never rolls back a local save. Settings includes **Sync now** and the mobile link. Keep the desktop open until it reports synced after making changes you want on the phone.
+The desktop saves a catalog backup before its first sync. Catalog and baseline writes are ordered so interruption produces a recoverable retry or conflict rather than data loss. Both apps reject saves or removals from a stale open editor/detail view after a newer edition arrives. Sync runs on launch, after local changes, and every 45 seconds while open. Failed sync never rolls back a local save. Settings includes **Sync now** and the mobile link. Keep the desktop open until it reports synced after making changes you want on the phone.
 
 ## Development
 
@@ -41,7 +41,7 @@ npm run dev
 
 The local service binds only to `127.0.0.1:5173`. Its D1/R2 data is isolated under `host/.wrangler`, not the hosted database. The build places the actual Uno static assets in `dist/client` and the API Worker in `dist/server/index.js`; schema-only Drizzle migrations are included with the hosting metadata.
 
-`tools/StarfleetLibrary.SyncSetup` can securely provision an existing service credential via stdin and seed/sync the catalog. `scripts/connect-private-sync.mjs` reads that input without echoing it. Never put service credentials in commands, source files, browser code, screenshots or logs.
+`tools/StarfleetLibrary.SyncSetup` can securely provision an existing service credential via stdin and seed/sync the catalog. Its `verify` command checks hosted metadata and cover checksums without modifying the catalog. `scripts/connect-private-sync.mjs` reads credential input without echoing it. Never put service credentials in commands, source files, browser code, screenshots or logs.
 
 The template includes an optional native iOS head (`-p:EnableIos=true`). It is not the delivered mobile build: native iOS still requires a Mac/Xcode, Apple signing and a native scanner integration. The shipped scanner is in the Home Screen web app.
 

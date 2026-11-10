@@ -34,16 +34,24 @@ public sealed class MobileStore
         ApplicationData.Current.LocalSettings.Values[StateKey] = JsonSerializer.Serialize(next,SyncJson.Context.DeviceState);
         state = next;
     }
-    public async Task SaveAsync(Book book)
+    public async Task SaveAsync(Book book, Book? expected = null)
     {
         await gate.WaitAsync();
-        try { Persist(state with { Books = state.Books.Where(b=>b.Id != book.Id).Append(book).ToArray() }); }
+        try
+        {
+            CatalogEditGuard.RequireUnchanged(state.Books, expected);
+            Persist(state with { Books = state.Books.Where(b=>b.Id != book.Id).Append(book with { }).ToArray() });
+        }
         finally { gate.Release(); }
     }
-    public async Task DeleteAsync(Guid id)
+    public async Task DeleteAsync(Guid id, Book? expected = null)
     {
         await gate.WaitAsync();
-        try { Persist(state with { Books = state.Books.Where(b=>b.Id != id).ToArray() }); }
+        try
+        {
+            CatalogEditGuard.RequireUnchanged(state.Books, expected);
+            Persist(state with { Books = state.Books.Where(b=>b.Id != id).ToArray() });
+        }
         finally { gate.Release(); }
     }
     public async Task SyncAsync(HttpClient http)

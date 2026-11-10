@@ -77,8 +77,16 @@ public sealed class UnoLibraryStore
                 File.Copy(file, Path.Combine(destination, Path.GetFileName(file)), overwrite: true);
     }
 
-    public Task SaveAsync(Book book) => MutateAsync(current => current.Where(b => b.Id != book.Id).Append(book with { }).ToArray());
-    public Task DeleteAsync(Guid id) => MutateAsync(current => current.Where(b => b.Id != id).ToArray());
+    public Task SaveAsync(Book book, Book? expected = null) => MutateAsync(current =>
+    {
+        CatalogEditGuard.RequireUnchanged(current, expected);
+        return current.Where(b => b.Id != book.Id).Append(book with { }).ToArray();
+    });
+    public Task DeleteAsync(Guid id, Book? expected = null) => MutateAsync(current =>
+    {
+        CatalogEditGuard.RequireUnchanged(current, expected);
+        return current.Where(b => b.Id != id).ToArray();
+    });
     public Task ReplaceAsync(IReadOnlyList<Book> replacement) => MutateAsync(_ => replacement.Select(b => b with { }).ToArray(), backup: true);
 
     private async Task MutateAsync(Func<IReadOnlyList<Book>, IReadOnlyList<Book>> change, bool backup = false)

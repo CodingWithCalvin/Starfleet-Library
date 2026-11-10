@@ -50,6 +50,25 @@ var tests = new (string Name, Func<string, Task> Run)[]
         await store.InitializeAsync(source);
         Ensure(store.IsReadOnly && !File.Exists(store.CatalogPath), "Bad source created a writable empty destination");
     }),
+    ("Open editors cannot overwrite or remove a newer edition", async root =>
+    {
+        var store = new UnoLibraryStore(root);
+        await store.InitializeAsync(Path.Combine(root, "no-source"));
+        var original = new Book { Title = "An edition", Ownership = OwnershipStatus.Wishlist };
+        await store.SaveAsync(original);
+        var incoming = original with { Notes = "Updated from another device" };
+        await store.SaveAsync(incoming, original);
+        try { await store.SaveAsync(original with { Ownership = OwnershipStatus.Owned }, original); throw new Exception("Stale save accepted"); }
+        catch (InvalidOperationException) { }
+        try { await store.DeleteAsync(original.Id, original); throw new Exception("Stale removal accepted"); }
+        catch (InvalidOperationException) { }
+        Ensure(store.Books.Single() == incoming, "Incoming edit was lost");
+        Ensure((await new CatalogRepository(store.CatalogPath).LoadAsync()).Single() == incoming, "Stale edit reached disk");
+        await store.DeleteAsync(incoming.Id, incoming);
+        try { await store.SaveAsync(incoming with { Title = "Resurrected" }, incoming); throw new Exception("Removed edition resurrected"); }
+        catch (InvalidOperationException) { }
+        Ensure(store.Books.Count == 0, "Removed edition reappeared");
+    }),
     ("Concurrent changes, defensive copies and restore backups preserve data", async root =>
     {
         var store = new UnoLibraryStore(root);
