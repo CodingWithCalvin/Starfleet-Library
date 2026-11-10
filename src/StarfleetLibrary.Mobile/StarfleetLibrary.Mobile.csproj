@@ -27,6 +27,10 @@
       Toolkit;
     </UnoFeatures>
   </PropertyGroup>
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+    <!-- Optional IL stripping stalled on the hosted Mac; retain IL and keep normal native compilation. -->
+    <EnableAssemblyILStripping>false</EnableAssemblyILStripping>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(MobileWindowsPreview)' == 'true'">
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>

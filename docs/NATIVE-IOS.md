@@ -34,4 +34,4 @@ Run `SyncSetup sync` to back up and seed the catalog, and `SyncSetup verify` to 
 
 ## Previous hosted copy
 
-The prior Sites service is not part of this architecture. Its desktop credential has been disabled locally and the source deployment integration removed. An earlier hosted copy can still exist until explicitly deleted from the hosting account; disabling sync does not delete that copy. The Windows catalog and cover files remain the source for migration. Never delete those local files when retiring the old service.
+The prior Sites service is retired. After verifying the encrypted Cloudflare migration, its 228 live catalog records and 228 cover objects were deleted; both storage counts are now zero and the old application returns HTTP 410. Its desktop credential is disabled and the source deployment integration removed. The Sites connector has no project-delete action, so an empty Site entry and provider-managed version/backup retention may remain until removed through the hosting interface. The Windows catalog and cover files are intact.
