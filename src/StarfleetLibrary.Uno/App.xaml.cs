@@ -29,7 +29,7 @@ public partial class App : Application
             if (MainWindow.AppWindow.Presenter is OverlappedPresenter presenter && presenter.State == OverlappedPresenterState.Minimized) presenter.Restore();
             MainWindow.Activate();
         });
-        MainWindow = new Window { Title = "Starfleet Library · Uno", Content = new MainPage() };
+        MainWindow = new Window { Title = "Starfleet Library", Content = new MainPage() };
         MainWindow.AppWindow.Resize(new Windows.Graphics.SizeInt32(1360, 900));
         MainWindow.AppWindow.TitleBar.BackgroundColor = ColorHelper.FromArgb(255, 16, 29, 50);
         MainWindow.AppWindow.TitleBar.ForegroundColor = Colors.White;

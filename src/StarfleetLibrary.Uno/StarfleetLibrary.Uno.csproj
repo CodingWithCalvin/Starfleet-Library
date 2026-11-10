@@ -6,7 +6,7 @@
     <UnoSingleProject>true</UnoSingleProject>
 
     <!-- Display name -->
-    <ApplicationTitle>Starfleet Library · Uno</ApplicationTitle>
+    <ApplicationTitle>Starfleet Library</ApplicationTitle>
     <!-- App Identifier -->
     <ApplicationId>com.calvin.starfleetlibrary.uno</ApplicationId>
     <!-- Versions -->
