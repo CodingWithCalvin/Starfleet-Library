@@ -1,0 +1,87 @@
+name: iPhone sideload IPA
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['src/**', '.github/workflows/ios-sideload.yml', 'global.json', 'Directory.Build.props']
+permissions:
+  contents: read
+concurrency:
+  group: ios-sideload-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.302'
+      - name: Select compatible Xcode and iOS workload
+        # Keep these versions aligned with the Native iPhone simulator workflow.
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.6.app
+          dotnet workload install ios --version 10.0.302.1
+          xcodebuild -version
+      - name: Validate Apple manifests
+        run: plutil -lint src/StarfleetLibrary.Mobile/Platforms/iOS/Info.plist src/StarfleetLibrary.Mobile/Platforms/iOS/PrivacyInfo.xcprivacy src/StarfleetLibrary.Mobile/Platforms/iOS/Entitlements.plist
+      - name: Build unsigned iPhone device IPA
+        # Keep Release/AOT compilation; skip expensive LLVM optimization for personal testing.
+        # Sideloadly supplies the device provisioning profile and signs the IPA on the user's PC.
+        run: |
+          mkdir -p artifacts
+          dotnet publish src/StarfleetLibrary.Mobile/StarfleetLibrary.Mobile.csproj \
+            -c Release -f net10.0-ios -r ios-arm64 \
+            -p:BuildIpa=true -p:ArchiveOnBuild=false \
+            -p:EnableCodeSigning=false -p:CodesignRequireProvisioningProfile=false \
+            -p:MtouchUseLlvm=false -p:ApplicationVersion=${{ github.run_number }} \
+            -p:IpaPackagePath="$PWD/artifacts/StarfleetLibrary-Sideload.ipa"
+      - name: Verify device IPA
+        run: |
+          python3 - <<'PY'
+          import plistlib
+          import zipfile
+
+          with zipfile.ZipFile('artifacts/StarfleetLibrary-Sideload.ipa') as ipa:
+              assert ipa.testzip() is None, 'IPA contains a corrupt entry'
+              manifests = [n for n in ipa.namelist() if n.startswith('Payload/') and n.endswith('.app/Info.plist') and n.count('/') == 2]
+              assert len(manifests) == 1, 'Expected one app in Payload/'
+              info = plistlib.loads(ipa.read(manifests[0]))
+              assert info['CFBundleIdentifier'] == 'com.calvin.starfleetlibrary.mobile'
+              assert info['CFBundleSupportedPlatforms'] == ['iPhoneOS'], 'IPA must target physical iPhones'
+              assert info['DTPlatformName'] == 'iphoneos', 'Simulator builds cannot be sideloaded'
+              app = manifests[0].removesuffix('Info.plist')
+              assert ipa.getinfo(app + info['CFBundleExecutable']).file_size > 0, 'Missing app executable'
+              assert not any(n.endswith('.mobileprovision') for n in ipa.namelist()), 'Signing belongs on the installing PC'
+              print(f"Verified {info['CFBundleIdentifier']}, version {info['CFBundleShortVersionString']} ({info['CFBundleVersion']}), iOS {info['MinimumOSVersion']}+")
+          PY
+          ditto -x -k artifacts/StarfleetLibrary-Sideload.ipa "$RUNNER_TEMP/sideload-validation"
+          APP=$(find "$RUNNER_TEMP/sideload-validation/Payload" -maxdepth 1 -name '*.app' -print -quit)
+          EXECUTABLE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")
+          xcrun lipo -verify_arch arm64 "$APP/$EXECUTABLE"
+          xcrun vtool -show-build "$APP/$EXECUTABLE" | tee "$RUNNER_TEMP/sideload-platform.txt"
+          grep -Eq 'platform[[:space:]]+IOS[[:space:]]*$' "$RUNNER_TEMP/sideload-platform.txt"
+          (cd artifacts && shasum -a 256 StarfleetLibrary-Sideload.ipa > StarfleetLibrary-Sideload.ipa.sha256)
+      - name: Upload sideload package
+        id: ipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: Starfleet-Library-iPhone-Sideload
+          path: |
+            artifacts/StarfleetLibrary-Sideload.ipa
+            artifacts/StarfleetLibrary-Sideload.ipa.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+      - name: Sideload instructions
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ### iPhone device IPA ready
+
+          Download [Starfleet-Library-iPhone-Sideload](${{ steps.ipa.outputs.artifact-url }}), extract the artifact ZIP, and open **StarfleetLibrary-Sideload.ipa** in [Sideloadly](https://sideloadly.io/) on your PC.
+
+          This is an unsigned **ios-arm64** device build. Sideloadly signs it using your Apple account and installs it on your connected iPhone. No Apple credentials or private catalog data are included in this artifact. Installation and camera scanning still need testing on a physical iPhone.
+
+          See [installation, refresh, and pairing instructions](https://github.com/${{ github.repository }}/blob/${{ github.sha }}/docs/NATIVE-IOS.md#sideload-on-your-iphone-from-windows).
+          EOF

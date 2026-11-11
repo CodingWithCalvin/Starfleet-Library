@@ -10,6 +10,21 @@ An Apple Developer membership is required for TestFlight distribution. Once enro
 
 On this Windows PC, `dotnet build src/StarfleetLibrary.Mobile/StarfleetLibrary.Mobile.csproj -f net10.0-ios -p:EnableCodeSigning=false` checks native C#/XAML compilation. The Mac workflow performs the actual Apple application build. `-p:MobileWindowsPreview=true` builds the same mobile interface as a Windows app for layout testing; it does not test the iPhone camera.
 
+## Sideload on your iPhone from Windows
+
+The **iPhone sideload IPA** workflow (`.github/workflows/ios-sideload.yml`) runs on relevant pushes to main and can also be started with **Actions → iPhone sideload IPA → Run workflow**. It uses the same hosted Mac toolchain to publish a Release/AOT **ios-arm64** device build. LLVM optimization is disabled for faster personal-test builds. Apple signing and provisioning are deferred to Sideloadly on your PC; this workflow needs no Apple account or signing secrets.
+
+CI checks the IPA's ZIP integrity, Payload structure, bundle identifier, iPhoneOS manifest, and ARM64 executable's iOS platform. A successful build uploads **Starfleet-Library-iPhone-Sideload** for 30 days. The artifact contains `StarfleetLibrary-Sideload.ipa` and its SHA-256 checksum. This verifies the package, not installation, camera scanning, or private sync on a physical phone.
+
+1. Download **Starfleet-Library-iPhone-Sideload** from a successful workflow run and extract the downloaded ZIP. Use the `.ipa` inside it, not the simulator ZIP from **Native iPhone**.
+2. Install [Sideloadly](https://sideloadly.io/) for Windows and the Apple prerequisites linked on its official download page.
+3. Connect the iPhone by USB, unlock it, and accept **Trust This Computer**.
+4. Select `StarfleetLibrary-Sideload.ipa` in Sideloadly, select your phone, and sign in with your Apple account there. Start installation. Apple credentials are entered locally in Sideloadly, not in this repository or GitHub Actions.
+5. Follow the phone's trust prompts. On iOS 16 or later, enable **Settings → Privacy & Security → Developer Mode** and restart when prompted. If needed, trust your developer identity under **Settings → General → VPN & Device Management**.
+6. Open Starfleet Library. In the desktop app's Settings, choose **Show iPhone connection code**; use the mobile app's connection control to pair with your private library. The IPA contains no pairing credentials or personal catalog.
+
+Free-account apps need refreshing every **7 days**, with a limit of **3 sideloaded apps**. Sideloadly can refresh automatically when the PC is running and the phone is reachable over USB or configured Wi-Fi. For updates and refreshes, keep the same Apple account and bundle identifier and install over the existing app to preserve its local data. See [Sideloadly's setup and refresh FAQ](https://sideloadly.io/faq).
+
 ## Cloudflare service
 
 The standalone Worker in `cloudflare/worker.js` authenticates every request itself. D1 stores edition IDs, revisions and encrypted payloads. R2 stores encrypted covers under keyed identifiers. There is no web app, public bucket, browser login, ChatGPT identity or Sites dispatch dependency.
