@@ -11,10 +11,15 @@ public class EntryPoint
         App.InitializeLogging();
 
         var host = UnoPlatformHostBuilder.Create()
-            .App(() => new App())
+            .App(CreateApplication)
             .UseAppleUIKit()
             .Build();
 
         host.Run();
     }
+
+    // Uno's native UIKit host reads the factory method's return type to select
+    // the UIApplicationDelegate. A lambda inferred as Func<Application> loses
+    // the concrete App type and starts the base delegate without our UI.
+    private static App CreateApplication() => new();
 }
