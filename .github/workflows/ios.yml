@@ -33,7 +33,13 @@ jobs:
       - name: Build native simulator app
         if: ${{ !inputs.signed }}
         # Keep Release/AOT compilation; skip expensive LLVM optimization for simulator testing only.
-        run: dotnet build src/StarfleetLibrary.Mobile/StarfleetLibrary.Mobile.csproj -c Release -f net10.0-ios -r iossimulator-arm64 -p:EnableCodeSigning=false -p:MtouchUseLlvm=false
+        run: dotnet build src/StarfleetLibrary.Mobile/StarfleetLibrary.Mobile.csproj -c Release -f net10.0-ios -r iossimulator-arm64 -p:EnableCodeSigning=true -p:CodesignKey=- -p:CodesignRequireProvisioningProfile=false -p:MtouchUseLlvm=false
+      - name: Verify simulator code signature
+        if: ${{ !inputs.signed }}
+        run: |
+          APP=$(find src/StarfleetLibrary.Mobile/bin/Release/net10.0-ios/iossimulator-arm64 -maxdepth 1 -name '*.app' -print -quit)
+          test -n "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
       - name: Install signing identity
         if: ${{ inputs.signed }}
         env:
