@@ -27,6 +27,8 @@ Free-account apps need refreshing every **7 days**, with a limit of **3 sideload
 
 ## Cloudflare service
 
+For a new installation or fork, follow the [README's Cloudflare setup guide](../README.md#fork-and-use-your-own-cloudflare-account) to select your own account, provision resources, generate credentials, and pair your apps.
+
 The standalone Worker in `cloudflare/worker.js` authenticates every request itself. D1 stores edition IDs, revisions and encrypted payloads. R2 stores encrypted covers under keyed identifiers. There is no web app, public bucket, browser login, ChatGPT identity or Sites dispatch dependency.
 
 The app encrypts metadata, notes, tombstones and cover references with AES-256-GCM before upload. Covers are encrypted separately. Fresh random nonces are used for every encryption; authenticated context binds entries to the vault, edition ID and revision, and covers to their keyed identifier. The encryption key is never sent to Cloudflare. Cloudflare can still observe request timing, opaque object IDs, revision numbers and encrypted sizes. Device tokens authenticate HTTPS requests; the Worker stores only SHA-256 token hashes. Removing a hash from its secret revokes that token. A stolen pairing code grants both access and decryption; keep a recovery copy in a password manager.
@@ -43,7 +45,7 @@ npx wrangler r2 bucket create starfleet-library-private-covers
 npx wrangler d1 migrations apply DB --remote --config cloudflare/wrangler.jsonc
 ```
 
-Initialize the desktop connection using `tools/StarfleetLibrary.SyncSetup initialize https://YOUR-WORKER.workers.dev/`. It generates the encryption key and device token locally, saves them encrypted for your Windows user, and prints only `VAULT_ID` and `DEVICE_TOKEN_HASHES`. Configure those two Worker secrets with `wrangler secret put --config cloudflare/wrangler.jsonc`, then deploy with `npm run deploy`. The service fails closed until configured. Do not enable public R2 access. The Worker never needs the encryption key or the original token.
+Initialize the desktop connection using `tools/StarfleetLibrary.SyncSetup initialize https://YOUR-WORKER.workers.dev/`. It generates the encryption key and device token locally, saves them encrypted for your Windows user, and prints only `VAULT_ID` and `DEVICE_TOKEN_HASHES`. Configure those two Worker secrets with `wrangler secret put --config cloudflare/wrangler.jsonc`, then deploy with `npm run deploy`. The service fails closed until configured. Do not enable public R2 access. The Worker receives the access token over HTTPS to authenticate requests and stores its hash in configuration; it never receives the encryption key.
 
 Run `SyncSetup sync` to back up and seed the catalog, and `SyncSetup verify` to verify encrypted round trips and every cover checksum. The desktop uses a separate `private-sync-baseline.json`; the old service's revision history is not reused. In desktop Settings, **Show iPhone connection code** reveals the pairing code. On iPhone, tap **Pair your private library**, paste the code and connect. Both devices then sync while open, retaining local edits during outages and requiring review for conflicting edits.
 
