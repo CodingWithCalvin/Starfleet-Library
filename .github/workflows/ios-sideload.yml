@@ -59,7 +59,7 @@ jobs:
           ditto -x -k artifacts/StarfleetLibrary-Sideload.ipa "$RUNNER_TEMP/sideload-validation"
           APP=$(find "$RUNNER_TEMP/sideload-validation/Payload" -maxdepth 1 -name '*.app' -print -quit)
           EXECUTABLE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")
-          xcrun lipo -verify_arch arm64 "$APP/$EXECUTABLE"
+          xcrun lipo "$APP/$EXECUTABLE" -verify_arch arm64
           xcrun vtool -show-build "$APP/$EXECUTABLE" | tee "$RUNNER_TEMP/sideload-platform.txt"
           grep -Eq 'platform[[:space:]]+IOS[[:space:]]*$' "$RUNNER_TEMP/sideload-platform.txt"
           (cd artifacts && shasum -a 256 StarfleetLibrary-Sideload.ipa > StarfleetLibrary-Sideload.ipa.sha256)
