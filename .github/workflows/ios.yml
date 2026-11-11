@@ -103,10 +103,23 @@ jobs:
           trap collect_diagnostics EXIT
           APP=$(find src/StarfleetLibrary.Mobile/bin/Release/net10.0-ios/iossimulator-arm64 -maxdepth 1 -name '*.app' -print -quit)
           xcrun simctl install "$DEVICE" "$APP"
-          LAUNCH=$(xcrun simctl launch --stdout="$PWD/artifacts/simulator/app-stdout.log" --stderr="$PWD/artifacts/simulator/app-stderr.log" "$DEVICE" com.calvin.starfleetlibrary.mobile)
+          LAUNCH=$(SIMCTL_CHILD_STARFLEET_CI_SMOKE=1 xcrun simctl launch --stdout="$PWD/artifacts/simulator/app-stdout.log" --stderr="$PWD/artifacts/simulator/app-stderr.log" "$DEVICE" com.calvin.starfleetlibrary.mobile)
           echo "$LAUNCH"
-          sleep 5
           APP_PID="${LAUNCH##*: }"
+          UI_READY=false
+          for attempt in {1..60}; do
+            kill -0 "$APP_PID"
+            if grep -q 'STARFLEET_UI_READY' artifacts/simulator/app-stdout.log; then
+              UI_READY=true
+              break
+            fi
+            sleep 2
+          done
+          if [ "$UI_READY" != true ]; then
+            echo 'The collection page did not finish loading.' >&2
+            exit 1
+          fi
+          sleep 5
           kill -0 "$APP_PID"
       - uses: actions/upload-artifact@v4
         if: ${{ always() && !inputs.signed }}

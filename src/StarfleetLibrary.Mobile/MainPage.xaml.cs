@@ -25,7 +25,14 @@ public sealed partial class MainPage : Page
         InitializeComponent();
         store = new();
         http = new() { Timeout = TimeSpan.FromSeconds(25) };
-        Loaded += async (_,_) => { ShowShelf(); await SyncAsync(); timer.Start(); };
+        Loaded += async (_,_) =>
+        {
+            ShowShelf();
+            if (Environment.GetEnvironmentVariable("STARFLEET_CI_SMOKE") == "1")
+                Console.WriteLine("STARFLEET_UI_READY");
+            await SyncAsync();
+            timer.Start();
+        };
         timer.Tick += async (_,_) => { if (!editing && !scanning) await SyncAsync(); };
     }
 
