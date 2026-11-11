@@ -109,7 +109,8 @@ jobs:
           UI_READY=false
           for attempt in {1..60}; do
             kill -0 "$APP_PID"
-            if grep -q 'STARFLEET_UI_READY' artifacts/simulator/app-stdout.log; then
+            # .NET iOS can route Console.WriteLine through NSLog/stderr.
+            if grep -q 'STARFLEET_UI_READY' artifacts/simulator/app-stdout.log artifacts/simulator/app-stderr.log; then
               UI_READY=true
               break
             fi
