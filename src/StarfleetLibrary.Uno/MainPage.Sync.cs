@@ -42,7 +42,12 @@ public sealed partial class MainPage
                 syncMessage=store.SyncConflicts.Length>0 ? "Some editions still need review." : $"Synced {DateTime.Now:t} · All changes saved.";
             }
             rows.Clear();
-            if(!detailOpen && section is "Collection" or "Wishlist" or "Reading now")RefreshResults();
+            if(!detailOpen && section is "Collection" or "Wishlist" or "Reading now")
+            {
+                var offsets=CaptureBodyScroll();
+                RefreshResults();
+                RestoreBodyScroll(offsets);
+            }
         }
         catch(Exception)
         {

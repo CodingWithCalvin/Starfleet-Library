@@ -85,7 +85,13 @@
   </Grid>
   <Grid x:Name="Workspace" Grid.Column="1" Margin="32,28,32,24" RowSpacing="18">
    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-   <Grid ColumnSpacing="12">
+   <StackPanel Spacing="12">
+    <Button x:Name="DetailBackButton" Content="←  Back to Collection" Visibility="Collapsed"
+      HorizontalAlignment="Left" Padding="16,10" MinHeight="44" CornerRadius="8"
+      Click="DetailBackClicked" AutomationProperties.AutomationId="DetailBack">
+     <Button.KeyboardAccelerators><KeyboardAccelerator Key="Left" Modifiers="Menu" Invoked="DetailBackInvoked" /></Button.KeyboardAccelerators>
+    </Button>
+    <Grid ColumnSpacing="12">
     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
     <StackPanel Spacing="5">
      <TextBlock Text="THE CAPTAIN’S SHELF" FontSize="10" FontWeight="SemiBold" CharacterSpacing="180" Foreground="#147D83" />
@@ -93,9 +99,11 @@
      <TextBlock x:Name="PageSubtitle" Text="Every edition. Every adventure." Foreground="{StaticResource Muted}" TextWrapping="Wrap" />
     </StackPanel>
     <Button x:Name="AddBookButton" Grid.Column="1" Content="+  Add book" Style="{StaticResource AccentButtonStyle}" Padding="18,11" CornerRadius="8" VerticalAlignment="Center" Click="AddClicked" AutomationProperties.AutomationId="AddBook" />
-   </Grid>
+    </Grid>
+   </StackPanel>
    <InfoBar x:Name="Notice" Grid.Row="1" IsOpen="False" IsClosable="True" />
    <Grid x:Name="Body" Grid.Row="2" />
+   <Grid x:Name="DetailBody" Grid.Row="2" Visibility="Collapsed" />
   </Grid>
  </Grid>
 </Page>

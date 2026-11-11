@@ -84,8 +84,9 @@ public sealed partial class MainPage : Page
     private void Navigate(string destination)
     {
         if (!ready) return;
+        if (detailOpen && destination == section) { ReturnFromDetails(); return; }
         section = destination;
-        detailOpen = false;
+        CloseDetails();
         Notice.IsOpen = false;
         foreach (var nav in navigation) nav.Button.Background = Brush(nav.Key == section ? "#293C55" : "#00101D32");
         SettingsNav.Background = Brush(section == "Settings" ? "#293C55" : "#00101D32");
@@ -255,7 +256,9 @@ public sealed partial class MainPage : Page
         if (terms.Length > 0) selection = selection.Where(b => terms.All(term => $"{b.Title} {b.Authors} {b.Isbn} {b.Series.DisplayName()} {b.CatalogLabel()}".Contains(term, StringComparison.OrdinalIgnoreCase)));
         selection = sort switch { 1 => selection.OrderBy(b => b.Authors).ThenBy(b => b.Title), 2 => selection.OrderByDescending(b => b.AddedAt), 3 => selection.OrderByDescending(b => b.PublicationYear).ThenBy(b => b.Title), _ => selection.OrderBy(b => b.Title, StringComparer.CurrentCultureIgnoreCase) };
         var visible = selection.Select(Row).ToArray();
-        itemView.ItemsSource = visible;
+        // Keep existing containers when the result set has not changed.
+        if (itemView.ItemsSource is not BookRow[] previous || !previous.SequenceEqual(visible))
+            itemView.ItemsSource = visible;
         resultCount!.Text = $"{visible.Length:N0} shown  /  {total:N0} titles";
         var active = new[] { seriesFilter, formatFilter, statusFilter }.Count(i => i > 0);
         filterButton!.Content = active > 0 ? $"Filters · {active}" : "Filters";

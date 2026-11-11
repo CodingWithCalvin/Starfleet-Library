@@ -9,13 +9,13 @@ public sealed partial class MainPage
 {
     private void ShowDetail(Book book)
     {
-        detailOpen = true;
-        itemView = null;
-        Body.Children.Clear();
+        var current = store.Books.FirstOrDefault(b => b.Id == book.Id);
+        if (current is null) { ShowNotice("This edition is no longer in your library.", true); return; }
+        book = current;
+        OpenDetails();
         PageTitle.Text = "Between the covers";
         PageSubtitle.Text = "Edition details and your reading journey.";
         var stack = new StackPanel { Spacing = 20 };
-        stack.Children.Add(ActionButton("←  Back to " + section.ToLowerInvariant(), (_, _) => Navigate(section)));
         var hero = new Grid { ColumnSpacing = 26 };
         hero.ColumnDefinitions.Add(new() { Width = new(148) });
         hero.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
@@ -76,12 +76,12 @@ public sealed partial class MainPage
         var delete = ActionButton("Remove from library", async (_, _) =>
         {
             if (!await ConfirmAsync("Remove this edition?", $"Remove “{book.Title}” and its reading log from this Uno library?", "Remove")) return;
-            try { await store.DeleteAsync(book.Id, book); rows.Remove(book.Id); Navigate(section); ShowNotice("Edition removed."); }
+            try { await store.DeleteAsync(book.Id, book); rows.Remove(book.Id); ReturnFromDetails(); ShowNotice("Edition removed."); }
             catch (Exception ex) { ShowNotice(ex.Message, true); }
         });
         delete.IsEnabled = !store.IsReadOnly;
         stack.Children.Add(delete);
-        ScrollBody(stack);
+        DetailBody.Children.Add(new ScrollViewer { Content = stack, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, HorizontalContentAlignment = HorizontalAlignment.Stretch });
     }
 
     private UIElement CoverImage(Book book, double width, double height)
