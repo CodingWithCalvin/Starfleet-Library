@@ -2,6 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 	<!-- see https://aka.platform/uno/apple-privacy-manifest for more information -->
+	<dict>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
 	
 	<!-- .NET Runtime/BCL -->
 	<dict>
@@ -37,5 +40,7 @@
 		<array>
 			<string>CA92.1</string>
 		</array>
+	</dict>
+	</array>
 	</dict>
 </plist>

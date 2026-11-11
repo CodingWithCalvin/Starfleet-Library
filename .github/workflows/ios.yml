@@ -17,7 +17,7 @@ concurrency:
 jobs:
   build:
     runs-on: macos-26
-    timeout-minutes: 35
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -28,9 +28,12 @@ jobs:
           sudo xcode-select --switch /Applications/Xcode_26.6.app
           dotnet workload install ios --version 10.0.302.1
           xcodebuild -version
+      - name: Validate Apple manifests
+        run: plutil -lint src/StarfleetLibrary.Mobile/Platforms/iOS/Info.plist src/StarfleetLibrary.Mobile/Platforms/iOS/PrivacyInfo.xcprivacy
       - name: Build native simulator app
         if: ${{ !inputs.signed }}
-        run: dotnet build src/StarfleetLibrary.Mobile/StarfleetLibrary.Mobile.csproj -c Release -f net10.0-ios -r iossimulator-arm64 -p:EnableCodeSigning=false
+        # Keep Release/AOT compilation; skip expensive LLVM optimization for simulator testing only.
+        run: dotnet build src/StarfleetLibrary.Mobile/StarfleetLibrary.Mobile.csproj -c Release -f net10.0-ios -r iossimulator-arm64 -p:EnableCodeSigning=false -p:MtouchUseLlvm=false
       - name: Install signing identity
         if: ${{ inputs.signed }}
         env:
@@ -63,25 +66,35 @@ jobs:
           APP=$(find src/StarfleetLibrary.Mobile/bin/Release/net10.0-ios/iossimulator-arm64 -maxdepth 1 -name '*.app' -print -quit)
           test -n "$APP"
           ditto -c -k --sequesterRsrc --keepParent "$APP" artifacts/StarfleetLibrary-Simulator.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-iphone-build
+          path: |
+            artifacts/*.zip
+            src/StarfleetLibrary.Mobile/bin/Release/net10.0-ios/ios-arm64/publish/*.ipa
+            src/StarfleetLibrary.Mobile/bin/Release/net10.0-ios/ios-arm64/*.ipa
+          if-no-files-found: error
+          retention-days: 14
       - name: Launch in iPhone simulator
         if: ${{ !inputs.signed }}
+        timeout-minutes: 15
         run: |
           DEVICE=$(xcrun simctl list devices available --json | python3 -c 'import sys,json; print(next(d["udid"] for devices in json.load(sys.stdin)["devices"].values() for d in devices if d["isAvailable"] and "iPhone" in d["name"]))')
           xcrun simctl boot "$DEVICE"
           xcrun simctl bootstatus "$DEVICE" -b
           APP=$(find src/StarfleetLibrary.Mobile/bin/Release/net10.0-ios/iossimulator-arm64 -maxdepth 1 -name '*.app' -print -quit)
           xcrun simctl install "$DEVICE" "$APP"
-          xcrun simctl launch "$DEVICE" com.calvin.starfleetlibrary.mobile
+          LAUNCH=$(xcrun simctl launch "$DEVICE" com.calvin.starfleetlibrary.mobile)
+          echo "$LAUNCH"
           sleep 5
+          APP_PID="${LAUNCH##*: }"
+          kill -0 "$APP_PID"
           xcrun simctl io "$DEVICE" screenshot artifacts/iPhone-simulator.png
       - uses: actions/upload-artifact@v4
+        if: ${{ !inputs.signed }}
         with:
-          name: native-iphone-build
-          path: |
-            artifacts/*.zip
-            artifacts/*.png
-            src/StarfleetLibrary.Mobile/bin/Release/net10.0-ios/ios-arm64/publish/*.ipa
-            src/StarfleetLibrary.Mobile/bin/Release/net10.0-ios/ios-arm64/*.ipa
+          name: iphone-simulator-preview
+          path: artifacts/iPhone-simulator.png
           if-no-files-found: error
           retention-days: 14
       - name: Remove temporary signing material
