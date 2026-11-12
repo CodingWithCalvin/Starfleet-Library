@@ -35,13 +35,13 @@ The app encrypts metadata, notes, tombstones and cover references with AES-256-G
 
 Windows protects its configuration with the current user's Windows data protection. iPhone stores it in non-synchronizing, device-only Keychain storage. Local catalogs and covers live in each application's private data directory and remain usable offline. Lookup of a new ISBN contacts Open Library only when explicitly requested.
 
-Provision resources in your own account with Wrangler:
+Copy `cloudflare/wrangler.example.jsonc` to `cloudflare/wrangler.jsonc` once, unless you already have a local config. Replace the example's all-zero account ID in that ignored local file with your own account ID, then provision resources with Wrangler:
 
 ```powershell
 npx wrangler login
-npx wrangler d1 create starfleet-library-private
-npx wrangler r2 bucket create starfleet-library-private-covers
-# Put the returned D1 ID in cloudflare/wrangler.jsonc.
+npx wrangler d1 create starfleet-library-private --config cloudflare/wrangler.jsonc --update-config=false
+npx wrangler r2 bucket create starfleet-library-private-covers --config cloudflare/wrangler.jsonc --update-config=false
+# Replace the all-zero D1 ID in your local cloudflare/wrangler.jsonc with the returned ID.
 npx wrangler d1 migrations apply DB --remote --config cloudflare/wrangler.jsonc
 ```
 

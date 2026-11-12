@@ -1,0 +1,27 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  // Copy once to wrangler.jsonc (ignored by Git) for your own deployment.
+  // The zero IDs below are placeholders used only for offline builds.
+  "name": "starfleet-library-private",
+  "main": "worker.js",
+  "compatibility_date": "2026-05-15",
+  "workers_dev": true,
+  "preview_urls": false,
+  // Replace with your Cloudflare account ID before creating resources.
+  "account_id": "00000000000000000000000000000000",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "starfleet-library-private",
+      // Replace with the UUID printed by wrangler d1 create before migration/deployment.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "starfleet-library-private-covers"
+    }
+  ]
+}

@@ -64,7 +64,15 @@ npm ci
 
 All remaining commands run from this repository root. In your fork's **Actions** tab, enable workflows if prompted. You can then run **Windows desktop** and **iPhone sideload IPA** manually; subsequent relevant pushes to `main` also trigger builds. See [GitHub's fork workflow guidance](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflows-in-forked-repositories).
 
-### 2. Select your Cloudflare account
+### 2. Create your local configuration and select your account
+
+On a fresh checkout, copy the [example configuration](cloudflare/wrangler.example.jsonc):
+
+```powershell
+Copy-Item cloudflare/wrangler.example.jsonc cloudflare/wrangler.jsonc
+```
+
+`cloudflare/wrangler.jsonc` is ignored by Git and holds your deployment settings. If you already have that file, edit it rather than overwriting it. The checked-in example contains only placeholder IDs; `npm run build` and CI use that example for an offline build. Local development and deployment use your local `wrangler.jsonc`.
 
 Sign in with Wrangler and identify the account you want to use:
 
@@ -73,7 +81,7 @@ npx wrangler login
 npx wrangler whoami
 ```
 
-**The checked-in [Wrangler configuration](cloudflare/wrangler.jsonc) identifies the maintainer's deployment. Replace its `account_id` with your own account ID before creating resources or running any remote commands.** Choose a Worker `name` for your account as well. The examples below use `starfleet-library-private` for the Worker and database, and `starfleet-library-private-covers` for the bucket; you can use different names if you update both the commands and configuration consistently.
+**In your local `cloudflare/wrangler.jsonc`, replace the all-zero `account_id` with your own account ID before creating resources or running any remote commands.** Choose a Worker `name` for your account as well. The examples below use `starfleet-library-private` for the Worker and database, and `starfleet-library-private-covers` for the bucket; you can use different names if you update both the commands and configuration consistently.
 
 ### 3. Create your database and cover bucket
 
@@ -91,7 +99,7 @@ Edit `cloudflare/wrangler.jsonc` using the values from your account:
 | `account_id` | Your Cloudflare account ID. |
 | `name` | Your chosen Worker name. |
 | `d1_databases[0].database_name` | The database name you just created. |
-| `d1_databases[0].database_id` | The new database UUID printed by `wrangler d1 create`; replace the inherited UUID. |
+| `d1_databases[0].database_id` | The new database UUID printed by `wrangler d1 create`; replace the all-zero placeholder. |
 | `r2_buckets[0].bucket_name` | The bucket name you just created. |
 
 Keep the binding names **`DB`** and **`BUCKET`**, because the Worker uses those names. Keep `migrations_dir` set to `migrations`, `workers_dev` enabled, and `preview_urls` disabled. Do not enable public access on the R2 bucket.
@@ -149,7 +157,7 @@ The connection code contains the service URL and credentials needed to access an
 
 The included GitHub Actions workflows build the apps and test the sync service; **they do not deploy to Cloudflare**. Deploy service changes from your configured checkout with `npm run deploy`, applying new D1 migrations first when needed. Your basic setup does not require Cloudflare credentials in GitHub.
 
-Review `cloudflare/wrangler.jsonc` when merging upstream changes so your fork continues to use your own account and resources. Never commit pairing codes, encryption keys, access tokens, local catalogs, or Apple signing files. For TestFlight distribution, configure your own Apple signing credentials; if you change the iPhone application identifier, update the project and the workflow launch/validation settings together. See the [native iPhone guide](docs/NATIVE-IOS.md).
+When merging upstream changes, compare `cloudflare/wrangler.example.jsonc` with your ignored local `cloudflare/wrangler.jsonc` and apply any new settings while preserving your account and resource IDs. Do not force-add the local config to Git. Never commit pairing codes, encryption keys, access tokens, local catalogs, or Apple signing files. For TestFlight distribution, configure your own Apple signing credentials; if you change the iPhone application identifier, update the project and the workflow launch/validation settings together. See the [native iPhone guide](docs/NATIVE-IOS.md).
 
 ## Checks
 
@@ -164,6 +172,6 @@ npm test
 npm run build
 ```
 
-`npm run build` performs a dry-run Worker build; it does not deploy the service.
+`npm run build` performs a dry-run Worker build using the checked-in example config; it needs no personal Cloudflare configuration and does not deploy the service. `npm run dev` and `npm run deploy` use your ignored local config.
 
 See [Windows setup and backups](docs/UNO-WINDOWS.md), [native iPhone builds and private sync](docs/NATIVE-IOS.md), and [validation notes](docs/UNO-VALIDATION.md).

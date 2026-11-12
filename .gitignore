@@ -21,3 +21,6 @@ outputs/
 *.p8
 *.pfx
 *.secrets.json
+
+# Deployment settings belong to each developer's Cloudflare account.
+/cloudflare/wrangler.jsonc
