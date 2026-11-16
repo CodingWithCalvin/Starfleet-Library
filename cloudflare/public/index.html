@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#112239">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Starfleet Library</title>
+  <link rel="icon" href="/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to library</a>
+  <section id="gate" class="gate" aria-label="Connect your library">
+    <div class="welcome">
+      <img src="/logo.svg" alt="" width="224" height="224">
+      <p class="eyebrow">STARFLEET LIBRARY</p>
+      <h1>Your next adventure.<br>Already on your shelf?</h1>
+      <p>Your collection and wishlist, wherever you explore.</p>
+      <span class="private-badge">PRIVATE LIBRARY · READ ONLY</span>
+    </div>
+    <div class="gate-content">
+      <div class="gate-card">
+        <p class="eyebrow accent">WELCOME ABOARD</p>
+        <h2 id="gate-title">Bring your library along.</h2>
+        <form id="pair-form">
+          <p>In the Windows app, open <strong>Settings → Show iPhone connection code</strong>. The same code connects this browser.</p>
+          <label for="connection">Private connection code</label>
+          <textarea id="connection" rows="3" required maxlength="8192" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="starfleet-v1:…"></textarea>
+          <label class="check"><input id="remember" type="checkbox"> Remember this browser with a password</label>
+          <div id="password-fields" hidden>
+            <label for="new-password">Create a browser password</label>
+            <input id="new-password" type="password" minlength="10" autocomplete="new-password" placeholder="At least 10 characters">
+            <label for="confirm-password">Confirm password</label>
+            <input id="confirm-password" type="password" minlength="10" autocomplete="new-password">
+            <p class="hint">Use a unique password. It protects the saved connection on this browser and never leaves your device.</p>
+          </div>
+          <button type="submit" class="primary full">Open my library <span aria-hidden="true">→</span></button>
+        </form>
+        <form id="unlock-form" hidden>
+          <p>Your connection is saved securely in this browser. Enter your browser password to open it.</p>
+          <label for="password">Browser password</label>
+          <input id="password" type="password" required autocomplete="current-password">
+          <button type="submit" class="primary full">Unlock library <span aria-hidden="true">→</span></button>
+          <button id="forget-locked" type="button" class="text-button">Forget this browser and pair again</button>
+        </form>
+        <p id="gate-status" class="status" role="status" aria-live="polite"></p>
+        <p class="privacy-note">Your books and covers are decrypted on this device. Browsing cannot change your collection or wishlist.</p>
+        <noscript>This private reader needs JavaScript to decrypt and display your library.</noscript>
+      </div>
+    </div>
+  </section>
+
+  <div id="library" class="app" hidden>
+    <aside class="sidebar">
+      <div class="brand"><img src="/logo.svg" alt="" width="76" height="76"><span>STARFLEET<br>LIBRARY</span></div>
+      <p class="nav-caption">YOUR LIBRARY</p>
+      <nav aria-label="Library sections">
+        <button id="collection-tab" class="nav-button active" aria-current="page"><span>Collection</span><span id="collection-count" class="count">0</span></button>
+        <button id="wishlist-tab" class="nav-button"><span>Wishlist</span><span id="wishlist-count" class="count">0</span></button>
+      </nav>
+      <div class="sidebar-footer"><span class="signal"></span> Private, read-only access<p>Make changes in the Windows<br>or iPhone app.</p></div>
+    </aside>
+    <main id="main" tabindex="-1">
+      <header class="topbar"><span class="eyebrow">PERSONAL ARCHIVES</span><div class="actions"><button id="refresh" class="quiet">↻ Refresh</button><button id="lock" class="quiet">Lock library</button></div></header>
+      <div class="page-heading"><div><h1 id="section-title">Collection</h1><p id="section-description">Every edition. Every adventure. All in one place.</p></div><span class="pill">READ ONLY</span></div>
+      <div class="toolbar">
+        <label class="search"><span class="sr-only">Search title, author, or ISBN</span><input id="search" type="search" placeholder="Search title, author, or ISBN…" autocomplete="off"></label>
+        <button id="filter-toggle" class="quiet filter-toggle" aria-expanded="false" aria-controls="filters">Filters</button>
+        <div class="layouts" role="group" aria-label="Layout"><button data-layout="covers" aria-pressed="true">Covers</button><button data-layout="cards" aria-pressed="false">Cards</button><button data-layout="table" aria-pressed="false">Table</button></div>
+      </div>
+      <div class="filters" id="filters">
+        <label>Series<select id="series"><option value="">All series</option></select></label>
+        <label>Format<select id="format"><option value="">All formats</option></select></label>
+        <label>Type<select id="kind"><option value="">Books &amp; comics</option><option value="0">Books only</option><option value="1">Comics only</option></select></label>
+        <label>Reading<select id="reading"><option value="">All statuses</option></select></label>
+        <label>Sort by<select id="sort"><option value="title">Title A–Z</option><option value="author">Author</option><option value="series">Series / number</option><option value="newest">Recently added</option></select></label>
+        <button id="clear" class="text-button">Reset filters</button>
+      </div>
+      <div class="result-summary"><p id="result-count" aria-live="polite"></p><p id="updated"></p></div>
+      <p id="library-status" class="status" role="status" aria-live="polite"></p>
+      <div id="results" class="covers" aria-label="Books"></div>
+      <div id="empty" class="empty" hidden><span aria-hidden="true">✧</span><h2 id="empty-title">No editions here yet.</h2><p id="empty-description"></p></div>
+      <footer class="page-footer"><span>STARFLEET LIBRARY</span><button id="forget" class="text-button">Forget this browser</button></footer>
+    </main>
+  </div>
+  <dialog id="details" aria-labelledby="detail-title">
+    <div class="dialog-toolbar"><button id="back" class="quiet">← Back to collection</button><span class="pill">READ ONLY</span></div>
+    <div id="detail-content"></div>
+  </dialog>
+</body>
+</html>

@@ -1,6 +1,6 @@
+import {json, securityHeaders, sameOrigin, readerSession, createSession, publicAsset, digest} from './reader.js';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const hash = /^[a-f0-9]{64}$/;
-const json = (body, status=200) => Response.json(body, {status, headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 const equal = (a,b) => { if(a.length!==b.length)return false; let diff=0;for(let i=0;i<a.length;i++)diff|=a.charCodeAt(i)^b.charCodeAt(i);return diff===0; };
 async function readBounded(request,limit) {
   if(Number(request.headers.get('Content-Length'))>limit)throw new RangeError();
@@ -18,10 +18,28 @@ async function authorized(request,env) {
   let accepted=false;for(const allowed of hashes)accepted=equal(digest,allowed)||accepted;return accepted;
 }
 export default {async fetch(request,env) {
-  if(!await authorized(request,env))return json({error:'Unauthorized'},401);
-  if(request.headers.has('Origin'))return json({error:'Native clients only'},403);
-  const path=new URL(request.url).pathname;
+  let path=new URL(request.url).pathname;
   try {
+    const asset=await publicAsset(request,env);if(asset)return asset;
+    if(path.startsWith('/reader/')) {
+      if(!sameOrigin(request,request.method!=='GET'))return json({error:'Same-origin access required'},403);
+      if(path==='/reader/session' && request.method==='POST') {
+        if(!await authorized(request,env))return json({error:'Unauthorized'},401);
+        return await createSession(env,await digest(request.headers.get('Authorization').slice(7)));
+      }
+      const session=await readerSession(request,env);
+      if(!session)return json({error:'Browser connection expired or revoked. Pair again.'},401);
+      if(path==='/reader/session/revoke' && request.method==='POST') {
+        await env.DB.prepare('DELETE FROM reader_sessions WHERE token_hash=?').bind(session).run();
+        return new Response(null,{status:204,headers:securityHeaders});
+      }
+      if(request.method!=='GET')return json({error:'Browser access is read-only'},405);
+      path=path.slice('/reader'.length);
+    } else {
+      if(!await authorized(request,env))return json({error:'Unauthorized'},401);
+      // Native write credentials are never used by the reader after pairing.
+      if(request.headers.has('Origin') || request.headers.has('Sec-Fetch-Site'))return json({error:'Native clients only'},403);
+    }
     if(path==='/v1/entries' && request.method==='GET')return json((await env.DB.prepare('SELECT id, revision, ciphertext FROM vault_entries ORDER BY id').all()).results);
     if(path==='/v1/entries' && request.method==='POST') {
       const data=JSON.parse(new TextDecoder().decode(await readBounded(request,256*1024)));
@@ -42,7 +60,7 @@ export default {async fetch(request,env) {
     }
     if(match && request.method==='GET') {
       const object=await env.BUCKET.get(match[1]);if(!object)return json({error:'Not found'},404);
-      return new Response(object.body,{headers:{'Content-Type':'application/octet-stream','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
+      return new Response(object.body,{headers:{...securityHeaders,'Content-Type':'application/octet-stream'}});
     }
     return json({error:'Not found'},404);
   } catch(error) {

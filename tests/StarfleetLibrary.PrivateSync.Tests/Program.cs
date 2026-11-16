@@ -5,6 +5,24 @@ using System.Text;
 using StarfleetLibrary.Core;
 using StarfleetLibrary.Sync;
 
+// Synthetic cross-runtime fixture for the read-only browser's Web Crypto tests.
+// These all-zero test credentials are unrelated to any deployed library.
+if(args.Length==2 && args[0]=="--browser-fixture")
+{
+    var sample=new PrivateSyncSettings("https://vault.test/",Guid.Parse("a1d3787e-8d62-42c5-896f-75df6617911a"),Convert.ToBase64String(new byte[32]),Convert.ToBase64String(new byte[32]));
+    using var cipher=new VaultCrypto(sample);
+    var edition=new Book {Id=Guid.Parse("7e3fce9e-e1e3-4bdf-a7f5-5bf74d0d63cd"),Title="Strange New Worlds — The High Country",Authors="Synthetic fixture",Series=TrekSeries.StrangeNewWorlds,Format=BookFormat.Ebook,Notes="<script>must remain text</script>",AddedAt=DateTimeOffset.Parse("2026-01-01T00:00:00Z")};
+    var fixtureImage=Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aV1cAAAAASUVORK5CYII=");
+    var imageHash=Convert.ToHexString(SHA256.HashData(fixtureImage)).ToLowerInvariant();
+    var imageId=cipher.CoverId(imageHash);
+    var fixtureWrite=cipher.EncryptWrite(new(edition.Id,6,edition,imageHash));
+    var deleted=cipher.EncryptWrite(new(edition.Id,7,null,null));
+    var fixture=new {description="Synthetic .NET VaultCrypto interoperability fixture; no real credentials or catalog data.",settings=sample,book=edition,entry=new VaultEntry(edition.Id,7,fixtureWrite.Ciphertext),tombstone=new VaultEntry(edition.Id,8,deleted.Ciphertext),coverHash=imageHash,coverId=imageId,cover=Convert.ToBase64String(cipher.Encrypt(fixtureImage,"cover/"+imageId)),image=Convert.ToBase64String(fixtureImage)};
+    await File.WriteAllTextAsync(args[1],System.Text.Json.JsonSerializer.Serialize(fixture,new System.Text.Json.JsonSerializerOptions {PropertyNamingPolicy=System.Text.Json.JsonNamingPolicy.CamelCase,WriteIndented=true}));
+    Console.WriteLine("Wrote synthetic .NET browser interoperability fixture.");
+    return;
+}
+
 var settings=new PrivateSyncSettings("https://vault.example/",Guid.NewGuid(),Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
 var server=new VaultServer();using var desktop=settings.CreateClient(server);using var phone=settings.CreateClient(server);
 var book=new Book { Title="A private Star Trek title",Notes="These notes must never reach the service in plaintext" };

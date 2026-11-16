@@ -2,7 +2,7 @@ name: Private sync service
 on:
   push:
     branches: [main]
-    paths: ['cloudflare/**', 'tests/cloudflare.test.mjs', 'package*.json', '.github/workflows/sync-service.yml']
+    paths: ['cloudflare/**', 'tests/*.test.mjs', 'tests/fixtures/**', 'package*.json', '.github/workflows/sync-service.yml']
   workflow_dispatch:
 permissions:
   contents: read

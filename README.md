@@ -1,6 +1,6 @@
 # Starfleet Library
 
-A personal Star Trek library with **native Uno Platform Windows and iPhone apps**, built with .NET 10. Track your collection and wishlist locally, and optionally sync your devices through an encrypted service in **your own Cloudflare account**.
+A personal Star Trek library with **native Uno Platform Windows and iPhone apps**, built with .NET 10, and a **read-only browser reader**. Track your collection and wishlist locally, and optionally sync your devices through an encrypted service in **your own Cloudflare account**.
 
 The repository includes the desktop app, mobile app, shared library code, sync service, tests, and build workflows. You can fork it to manage your own collection without connecting to the maintainer's library or hosted service.
 
@@ -12,6 +12,7 @@ The repository includes the desktop app, mobile app, shared library code, sync s
 - Edition metadata, reading progress, ratings, finish dates, notes and insights.
 - Local cover storage, offline image caching, JSON export and restore.
 - Native iPhone Collection and Wishlist, Apple camera ISBN/UPC barcode scanning, and manual entry.
+- Private browser access to Collection and Wishlist, with cover, card and table layouts, search, comic/series/format filters, and edition details.
 - End-to-end encrypted synchronization in your own Cloudflare account, with per-edition revision checks, offline changes and conflict review.
 
 ## Get the apps
@@ -25,6 +26,20 @@ Open the repository's **Actions** tab, choose a workflow, and download its artif
 | Native iPhone | `native-iphone-build` | By default, a Mac simulator build for development; it cannot be installed on a phone. |
 
 See the [iPhone sideloading instructions](docs/NATIVE-IOS.md#sideload-on-your-iphone-from-windows) for installation from Windows. GitHub's hosted Macs build the iPhone app, so you do not need to own a Mac. The native iPhone guide also covers signed builds for TestFlight.
+
+## Open your library in a browser
+
+After configuring Cloudflare below, open **your own Worker HTTPS address** in a desktop or phone browser. The root address serves the reader; there is no separate Pages deployment or ChatGPT-hosted component.
+
+1. In the Windows app, open **Settings → Show iPhone connection code**. This existing code also pairs the browser.
+2. Paste it into **Private connection code** at your Worker address and select **Open my library**.
+3. Optionally choose **Remember this browser with a password**. Create a unique password of at least 10 characters; it encrypts the saved browser connection locally. Without this option, refreshing or closing the page requires pairing again.
+
+The reader can browse Collection and Wishlist, search titles/authors/ISBNs, exclude comics, switch between Covers/Cards/Table, and open edition details. The visible Back button and browser Back preserve the search, filters, layout, and list position. On phones, expand **Filters** when needed. Use **Refresh** to see newly synced changes; adding or editing books and camera scanning remain in the native apps.
+
+The original connection code is exchanged for a separate **read-only token** that expires after 30 days. The native write token is not saved in browser storage. Catalog records and covers are decrypted with Web Crypto on the device; the encryption key and browser password never go to the Worker. Optional saved access contains only password-encrypted connection information, not a plaintext catalog or an unencrypted key. **Lock library** clears the displayed catalog and in-memory cover URLs. **Forget this browser** removes saved access and, when unlocked and online, revokes that browser token. If locked, forgetting only removes the local encrypted connection; the server token still expires automatically. Removing the parent device token hash also revokes all browser sessions paired with it.
+
+This reader requires an internet connection to load the catalog and covers. It does not replace the native apps' offline storage. Keep your connection code in a password manager; a forgotten browser password is recovered by forgetting the browser and pairing again. Browser privacy depends on trusting the hosted reader code and the device running it; do not pair on a shared or untrusted computer.
 
 ## Run the Windows app from source
 
@@ -44,8 +59,8 @@ Each deployment serves one private library shared between your devices. Forking 
 
 | Cloudflare resource | Purpose |
 | --- | --- |
-| Worker | Authenticates app requests and serves the sync API over HTTPS. |
-| D1 database | Stores edition IDs, revisions, and encrypted catalog records. |
+| Worker | Serves the browser reader's static files and authenticates private API requests over HTTPS. |
+| D1 database | Stores edition IDs, revisions, encrypted catalog records, and hashed expiring browser credentials. |
 | R2 bucket | Stores encrypted cover images. |
 
 The apps encrypt catalog content and covers before upload. The decryption key stays on your devices. Cloudflare can still see operational metadata such as record IDs, revisions, sizes, and request timing. Keep the R2 bucket private; the apps access it through the authenticated Worker.
@@ -102,7 +117,7 @@ Edit `cloudflare/wrangler.jsonc` using the values from your account:
 | `d1_databases[0].database_id` | The new database UUID printed by `wrangler d1 create`; replace the all-zero placeholder. |
 | `r2_buckets[0].bucket_name` | The bucket name you just created. |
 
-Keep the binding names **`DB`** and **`BUCKET`**, because the Worker uses those names. Keep `migrations_dir` set to `migrations`, `workers_dev` enabled, and `preview_urls` disabled. Do not enable public access on the R2 bucket.
+Keep the binding names **`DB`**, **`BUCKET`**, and **`ASSETS`**, because the Worker uses those names. Keep the example's `assets` block, including `run_worker_first: true`, so security headers and API routing run before static asset serving. Keep `migrations_dir` set to `migrations`, `workers_dev` enabled, and `preview_urls` disabled. Do not enable public access on the R2 bucket.
 
 After replacing the database ID, create the tables and deploy the Worker:
 
@@ -111,7 +126,7 @@ npx wrangler d1 migrations apply DB --remote --config cloudflare/wrangler.jsonc
 npm run deploy
 ```
 
-Save the HTTPS Worker URL printed by deployment. The service rejects requests until its authentication secrets are configured in the next step. A browser request returning `401 Unauthorized` is expected; this endpoint is an app API, not a website.
+Save the HTTPS Worker URL printed by deployment. Its root address displays the reader's connection screen. Catalog and cover APIs still return `401 Unauthorized` without valid credentials, and pairing fails closed until the authentication secrets are configured in the next step. No library data is included in the public static files.
 
 Cloudflare references: [D1 creation and migrations](https://developers.cloudflare.com/d1/wrangler-commands/) and [R2 bucket creation](https://developers.cloudflare.com/r2/buckets/create-buckets/).
 
@@ -157,6 +172,8 @@ The connection code contains the service URL and credentials needed to access an
 
 The included GitHub Actions workflows build the apps and test the sync service; **they do not deploy to Cloudflare**. Deploy service changes from your configured checkout with `npm run deploy`, applying new D1 migrations first when needed. Your basic setup does not require Cloudflare credentials in GitHub.
 
+To upgrade a deployment that previously served only the native API, copy the new `assets` block from the example into your ignored local config, apply D1 migrations (including `0002_reader_sessions.sql`), then deploy. This creates a separate browser-session table and leaves existing catalog records, covers, native credentials, and encryption keys intact. See [Cloudflare's static asset binding documentation](https://developers.cloudflare.com/workers/static-assets/binding/) for the asset configuration.
+
 When merging upstream changes, compare `cloudflare/wrangler.example.jsonc` with your ignored local `cloudflare/wrangler.jsonc` and apply any new settings while preserving your account and resource IDs. Do not force-add the local config to Git. Never commit pairing codes, encryption keys, access tokens, local catalogs, or Apple signing files. For TestFlight distribution, configure your own Apple signing credentials; if you change the iPhone application identifier, update the project and the workflow launch/validation settings together. See the [native iPhone guide](docs/NATIVE-IOS.md).
 
 ## Checks
@@ -173,5 +190,7 @@ npm run build
 ```
 
 `npm run build` performs a dry-run Worker build using the checked-in example config; it needs no personal Cloudflare configuration and does not deploy the service. `npm run dev` and `npm run deploy` use your ignored local config.
+
+The browser tests include a synthetic fixture generated by the real .NET `VaultCrypto` implementation. To regenerate it after a deliberate protocol change, run `dotnet run --project tests/StarfleetLibrary.PrivateSync.Tests -- --browser-fixture tests/fixtures/browser-vault.json`, then `npm test`. Its all-zero credentials are test data and cannot access a real deployment.
 
 See [Windows setup and backups](docs/UNO-WINDOWS.md), [native iPhone builds and private sync](docs/NATIVE-IOS.md), and [validation notes](docs/UNO-VALIDATION.md).

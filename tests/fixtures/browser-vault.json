@@ -1,0 +1,45 @@
+{
+  "description": "Synthetic .NET VaultCrypto interoperability fixture; no real credentials or catalog data.",
+  "settings": {
+    "serverUrl": "https://vault.test/",
+    "vaultId": "a1d3787e-8d62-42c5-896f-75df6617911a",
+    "deviceToken": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+    "encryptionKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  },
+  "book": {
+    "id": "7e3fce9e-e1e3-4bdf-a7f5-5bf74d0d63cd",
+    "title": "Strange New Worlds \u2014 The High Country",
+    "authors": "Synthetic fixture",
+    "series": 8,
+    "bookNumber": "",
+    "isbn": "",
+    "publisher": "",
+    "publicationYear": "",
+    "edition": "",
+    "format": 2,
+    "kind": 0,
+    "ownership": 0,
+    "readingStatus": 0,
+    "pageCount": 0,
+    "currentPage": 0,
+    "rating": 0,
+    "notes": "\u003Cscript\u003Emust remain text\u003C/script\u003E",
+    "addedAt": "2026-01-01T00:00:00+00:00",
+    "finishedAt": null,
+    "coverUrl": null
+  },
+  "entry": {
+    "id": "7e3fce9e-e1e3-4bdf-a7f5-5bf74d0d63cd",
+    "revision": 7,
+    "ciphertext": "AcHGBQ31qOxim9VjNMxWlgArjZZ0uvKoaRAOQ4Zdt8uNrTn\u002Bq2j93J5G\u002BaF2Frnz10G7TcmWdc2kKg0BP9tuauxDvpZ0t6DAixofBERm12/XmdV\u002BCjdy0tIWKDdVf6Ad\u002BVI2UoUn81ThcK4hUK9dRX2XYFS4LzvgDeYkxKxZ/9Qn2YDlpPeycf693\u002BzqPqNg1KRKR9QxGe53adNj8hufHnyKyuMtJFX1gMX5P\u002B96sjEp802Y4RgkZj3t8UqVStcDAwoP//ORgE1FleagFuWyhIIjjlKyj2HMpx7/ei1BXvsgUFTMoDUhaovCrudikSMJO/Sj\u002Brz1jKpIXBLBDLU3VwdD2UFTag\u002BH9RjTrqbKBhTPXDHzYsrheu8ch/IVFd5YM9Mhs1KIhqzgU7gNgLEW31eaYjLF4jb7TZIpGwMxEf893RXzzsqX/tvgP56B8EJ8fYCyKieIWMwjUdoM4wRXZdIVVAZ1zh\u002BKNtMZDj80wAYnuczzag9yBuEsNDelnJZMU9\u002BunkYw9DbmLCKZiG9E/qY2xzAiDz1jG7N9VyJNXofZQaFIFAPICbTGWsl8lRFwZyhelMmqzpS7a4fos6PcEuwYJnATIgE04SHdu\u002BDmY9BM26n7e8Snt\u002BPLlWbDTJ1hVu8Qq2JTugCEIqx/r0YTV5ocZ429aq543Vz8Loz9GfvatscZQDTkNFYxAOnOh81wmtD2A1R/PdWADAIzwJ7Jle0j3Vb5C78nBr\u002BGvQ=="
+  },
+  "tombstone": {
+    "id": "7e3fce9e-e1e3-4bdf-a7f5-5bf74d0d63cd",
+    "revision": 8,
+    "ciphertext": "AYZKaHKJYSU0jsUdfsseYUXaqEWsi9Ri7uio\u002BpYanoQsp2jsBoDcoJDYef5rFuve\u002BS6Wvf71pA=="
+  },
+  "coverHash": "1bb88d75bf4f20dfa60330763f9623414763204d70ff68f85006a723330a54cc",
+  "coverId": "1d18d58a7f171f204132e25609a5cb55f4f6764e66731f5711d85423ba7838e2",
+  "cover": "AWsheHp0qGOM4I\u002B4SeRzmFAFLBQutJNxsOIMdMhN/eg6Z/TYGS8U\u002BdIE8CVm4XLibvXuvcqavOpiV9PqQ0176XkWT5UwmJWM/NJqf8AkuXTYQ5rvKGuoCApa54pUr/TyLA==",
+  "image": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO\u002BaV1cAAAAASUVORK5CYII="
+}
