@@ -26,6 +26,15 @@ if(args.FirstOrDefault()=="connect")
 }
 var root=args.Length>1 ? args[1] : UnoLibraryStore.DefaultRoot;
 using var http=await SyncAccess.OpenAsync() ?? throw new InvalidOperationException("Connect the private service first.");
+if (args.FirstOrDefault()=="publish-public")
+{
+    // The device-side adapter publishes only the limited public projection when
+    // PUBLIC_READER_ENABLED is explicitly enabled on the authenticated service.
+    http.Timeout=TimeSpan.FromMinutes(10);
+    var published=await new SyncClient(http).GetAsync();
+    Console.WriteLine($"Public catalog publication checked for {published.Count(entry=>entry.Book is not null)} editions. No private catalog records were changed.");
+    return;
+}
 if (args.FirstOrDefault()=="verify")
 {
     var entries=await new SyncClient(http).GetAsync();

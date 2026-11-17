@@ -1,5 +1,6 @@
 import {json, securityHeaders, sameOrigin, readerSession, createSession, publicAsset, digest} from './reader.js';
 import {loginInfo, configureLogin, passwordLogin} from './password-login.js';
+import {publicEnabled, readPublic, publishPublic} from './public-catalog.js';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const hash = /^[a-f0-9]{64}$/;
 const equal = (a,b) => { if(a.length!==b.length)return false; let diff=0;for(let i=0;i<a.length;i++)diff|=a.charCodeAt(i)^b.charCodeAt(i);return diff===0; };
@@ -22,9 +23,10 @@ export default {async fetch(request,env) {
   let path=new URL(request.url).pathname;
   try {
     const asset=await publicAsset(request,env);if(asset)return asset;
+    if(path.startsWith('/public/'))return await readPublic(request,env);
     if(path.startsWith('/reader/')) {
       if(!sameOrigin(request,request.method!=='GET'))return json({error:'Same-origin access required'},403);
-      if(path==='/reader/login-info' && request.method==='GET')return await loginInfo(env);
+      if(path==='/reader/login-info' && request.method==='GET')return publicEnabled(env)?json({public:true}):await loginInfo(env);
       if(path==='/reader/login' && request.method==='POST') {
         const data=JSON.parse(new TextDecoder().decode(await readBounded(request,1024)));
         if(!data || typeof data!=='object' || Array.isArray(data))return json({error:'Invalid sign-in request'},400);
@@ -52,6 +54,7 @@ export default {async fetch(request,env) {
       if(!await authorized(request,env))return json({error:'Unauthorized'},401);
       // Native write credentials are never used by the reader after pairing.
       if(request.headers.has('Origin') || request.headers.has('Sec-Fetch-Site'))return json({error:'Native clients only'},403);
+      if(path==='/v1/publication' || path.startsWith('/v1/public/'))return await publishPublic(request,env,readBounded);
     }
     if(path==='/v1/entries' && request.method==='GET')return json((await env.DB.prepare('SELECT id, revision, ciphertext FROM vault_entries ORDER BY id').all()).results);
     if(path==='/v1/entries' && request.method==='POST') {

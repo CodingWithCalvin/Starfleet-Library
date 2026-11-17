@@ -37,8 +37,8 @@ public sealed record VaultEntry(Guid Id, long Revision, string Ciphertext);
 public sealed record VaultWrite(Guid Id, long ExpectedRevision, string Ciphertext);
 public sealed record VaultPayload(Book? Book, string? Cover);
 
-// Only this device-side adapter sees plaintext. The Worker receives AES-GCM
-// envelopes and keyed cover IDs, and never receives the encryption key.
+// The full catalog uses AES-GCM envelopes and keyed cover IDs. Optional public
+// publication sends a separate limited projection, never the encryption key.
 public sealed class VaultCrypto : IDisposable
 {
     private readonly byte[] key;
@@ -81,12 +81,14 @@ public sealed class EncryptedSyncHandler : HttpMessageHandler
 {
     private readonly HttpClient transport;
     private readonly VaultCrypto crypto;
+    private readonly PublicCatalogPublisher publisher;
     public EncryptedSyncHandler(PrivateSyncSettings settings, HttpMessageHandler handler)
     {
         transport = new(handler) { BaseAddress = settings.Validate(), Timeout = TimeSpan.FromSeconds(40) };
         transport.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", settings.DeviceToken);
         transport.DefaultRequestHeaders.Add("X-Starfleet-Vault", settings.VaultId.ToString("D"));
         crypto = new(settings);
+        publisher = new(transport, crypto);
     }
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
@@ -104,10 +106,14 @@ public sealed class EncryptedSyncHandler : HttpMessageHandler
             if (request.Method == HttpMethod.Get)
             {
                 var entries = await response.Content.ReadFromJsonAsync(PrivateJson.Context.VaultEntryArray, ct) ?? throw new InvalidDataException("Missing encrypted catalog.");
-                return new(response.StatusCode) { Content = JsonContent.Create(entries.Select(crypto.DecryptEntry).ToArray(), SyncJson.Context.SyncEntryArray) };
+                var decrypted=entries.Select(crypto.DecryptEntry).ToArray();
+                await publisher.PublishAsync(decrypted,ct);
+                return new(response.StatusCode) { Content = JsonContent.Create(decrypted, SyncJson.Context.SyncEntryArray) };
             }
             var entry = await response.Content.ReadFromJsonAsync(PrivateJson.Context.VaultEntry, ct) ?? throw new InvalidDataException("Missing encrypted acknowledgement.");
-            return new(response.StatusCode) { Content = JsonContent.Create(crypto.DecryptEntry(entry), SyncJson.Context.SyncEntry) };
+            var decryptedEntry=crypto.DecryptEntry(entry);
+            await publisher.PublishAsync([decryptedEntry],ct);
+            return new(response.StatusCode) { Content = JsonContent.Create(decryptedEntry, SyncJson.Context.SyncEntry) };
         }
         const string prefix = "/api/covers/";
         if (!path.StartsWith(prefix)) throw new InvalidOperationException("Unsupported private sync request.");

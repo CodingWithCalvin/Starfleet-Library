@@ -12,7 +12,7 @@ The repository includes the desktop app, mobile app, shared library code, sync s
 - Edition metadata, reading progress, ratings, finish dates, notes and insights.
 - Local cover storage, offline image caching, JSON export and restore.
 - Native iPhone Collection and Wishlist, Apple camera ISBN/UPC barcode scanning, and manual entry.
-- Private browser access to Collection and Wishlist, with cover, card and table layouts, search, comic/series/format filters, and edition details.
+- Read-only browser access to Collection and Wishlist, with cover, card and table layouts, search, comic/series/format filters, and edition details. Choose public access or private password sign-in for your deployment.
 - End-to-end encrypted synchronization in your own Cloudflare account, with per-edition revision checks, offline changes and conflict review.
 
 ## Get the apps
@@ -30,6 +30,28 @@ See the [iPhone sideloading instructions](docs/NATIVE-IOS.md#sideload-on-your-ip
 ## Open your library in a browser
 
 After configuring Cloudflare below, open **your own Worker HTTPS address** in a desktop or phone browser. The root address serves the reader; there is no separate Pages deployment or ChatGPT-hosted component.
+
+### Public access without a login
+
+To make your collection and wishlist viewable by anyone, set `vars.PUBLIC_READER_ENABLED` to the string `"true"` in your ignored `cloudflare/wrangler.jsonc`, apply migrations, and deploy:
+
+```powershell
+npx wrangler d1 migrations apply DB --remote --config cloudflare/wrangler.jsonc
+npm run deploy
+dotnet run --project tools/StarfleetLibrary.SyncSetup/StarfleetLibrary.SyncSetup.csproj -c Release -- publish-public
+```
+
+Run the publication command on the Windows profile already connected to your library, after completing the native sync setup below. It publishes the synced catalog without changing private catalog records. The Worker address then opens directly to Collection with no password, connection code, or browser setup. The Windows app can be off while you browse.
+
+Public access includes titles, authors, series, ISBNs, edition and publisher details, format, book/comic labels, ownership/wishlist status, page counts, and covers. Notes, ratings, reading progress, dates, and credentials are excluded. A separate public catalog and cover copies are stored in Cloudflare; the original encrypted catalog, encrypted covers, and device credentials remain intact. Visitors cannot add, edit, delete, or sync books.
+
+Updated native apps maintain the public copy during normal sync. After enabling this on an existing deployment, update your apps or run `publish-public` again after syncing changes with an older app. Publication is checked against the current encrypted edition revision, so a changed edition is hidden until its matching public copy is published. Set `PUBLIC_READER_ENABLED` back to `"false"` and redeploy to disable public access; stored public copies remain in your account.
+
+The checked-in example defaults to private access. Public mode never uploads the library encryption key to the Worker.
+
+### Private password sign-in
+
+With `PUBLIC_READER_ENABLED` absent or set to `"false"`, use the following optional password setup instead:
 
 1. **Once, to enable password sign-in:** copy **Settings → Show iPhone connection code** from the Windows app, or use your existing recovery copy. Paste it into **Private connection code** at your Worker address.
 2. Choose a unique **library password** of at least 14 characters and select **Save password and open library**. Save the password and recovery connection code in your password manager.
@@ -59,15 +81,15 @@ The desktop project is in `src/StarfleetLibrary.Uno`; the native iPhone project 
 
 ## Fork and use your own Cloudflare account
 
-Each deployment serves one private library shared between your devices. Forking copies the application and service code; you create your own hosted resources, catalog, and pairing credentials.
+Each deployment serves one library shared between your devices, with private synchronization and optional public browsing. Forking copies the application and service code; you create your own hosted resources, catalog, and pairing credentials.
 
 | Cloudflare resource | Purpose |
 | --- | --- |
-| Worker | Serves the browser reader's static files and authenticates private API requests over HTTPS. |
-| D1 database | Stores edition IDs, revisions, encrypted catalog records, the password-encrypted library key, and authentication/session hashes. |
-| R2 bucket | Stores encrypted cover images. |
+| Worker | Serves the browser reader, authenticates private API requests, and optionally serves the public catalog over HTTPS. |
+| D1 database | Stores encrypted catalog records, revisions, optional password authentication data, and the limited public catalog when enabled. |
+| R2 bucket | Stores encrypted cover images and separate public cover copies when enabled. |
 
-The apps encrypt catalog content and covers before upload. The plaintext decryption key stays on your devices; enabling browser password sign-in stores an additional password-encrypted copy. Cloudflare can still see operational metadata such as record IDs, revisions, sizes, and request timing. Keep the R2 bucket private; the apps access it through the authenticated Worker.
+The apps encrypt the full catalog and covers before upload. The plaintext decryption key stays on your devices; enabling browser password sign-in stores an additional password-encrypted copy. Public mode also uploads the limited book fields and cover copies described above in plaintext. Cloudflare can see operational metadata such as record IDs, revisions, sizes, and request timing. Keep the R2 bucket private; all cover access goes through the Worker.
 
 ### 1. Fork, clone, and install the tools
 
@@ -178,7 +200,7 @@ The connection code contains the service URL and credentials needed to access an
 
 The included GitHub Actions workflows build the apps and test the sync service; **they do not deploy to Cloudflare**. Deploy service changes from your configured checkout with `npm run deploy`, applying new D1 migrations first when needed. Your basic setup does not require Cloudflare credentials in GitHub.
 
-To upgrade an older deployment, copy the `assets` and `ratelimits` blocks from the example into your ignored local config, apply D1 migrations (including `0002_reader_sessions.sql` and `0003_reader_password.sql`), then deploy. These add browser authentication storage and leave existing catalog records, covers, native credentials, and encryption keys intact. Deploying does not choose a library password: complete the one-time setup screen yourself afterward. See [Cloudflare's static asset binding documentation](https://developers.cloudflare.com/workers/static-assets/binding/) for the asset configuration.
+To upgrade an older deployment, copy the `assets`, `ratelimits`, and `vars` blocks from the example into your ignored local config, apply all D1 migrations (through `0004_public_catalog.sql`), then deploy. These add browser authentication and public catalog storage, leaving existing encrypted records, covers, native credentials, and encryption keys intact. Choose public access or complete the private password setup described above. See [Cloudflare's static asset binding documentation](https://developers.cloudflare.com/workers/static-assets/binding/) for the asset configuration.
 
 When merging upstream changes, compare `cloudflare/wrangler.example.jsonc` with your ignored local `cloudflare/wrangler.jsonc` and apply any new settings while preserving your account and resource IDs. Do not force-add the local config to Git. Never commit pairing codes, encryption keys, access tokens, local catalogs, or Apple signing files. For TestFlight distribution, configure your own Apple signing credentials; if you change the iPhone application identifier, update the project and the workflow launch/validation settings together. See the [native iPhone guide](docs/NATIVE-IOS.md).
 

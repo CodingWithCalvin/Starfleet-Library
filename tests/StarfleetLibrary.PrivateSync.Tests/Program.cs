@@ -55,11 +55,26 @@ foreach(var url in new[]{"https://library.chatgpt.site/","http://public.example/
 {try{(settings with {ServerUrl=url}).Validate();throw new Exception("Unsafe endpoint accepted");}catch(InvalidDataException){}}
 Check(true,"Sites, insecure endpoints and URL credentials are rejected");
 Console.WriteLine("13 private sync checks passed.");
+var publicServer=new VaultServer {PublishEnabled=true};
+using var publicClient=settings.CreateClient(publicServer);
+var publicSync=new SyncClient(publicClient);
+await publicSync.UploadCoverAsync(hash,image);
+var publicResult=await publicSync.SynchronizeAsync([book],[],new Dictionary<Guid,string>{{book.Id,hash}});
+Check(publicServer.PublicEntries.Count==1 && publicServer.PublicEntries[book.Id].Book!.Title==book.Title,"Public mode publishes book metadata after authenticated sync");
+Check(publicServer.PublicCovers[hash].SequenceEqual(image),"Public mode publishes a separate plaintext cover copy");
+Check(!publicServer.LastPublicBody.Contains(book.Notes) && !publicServer.LastPublicBody.Contains("readingStatus") && !publicServer.LastPublicBody.Contains("rating") && !publicServer.LastPublicBody.Contains(settings.EncryptionKey),"Public projection excludes notes, reading history, ratings and keys");
+await publicSync.SynchronizeAsync([],publicResult.Baseline);
+Check(publicServer.PublicEntries[book.Id].Book is null,"Deleting a native edition removes it from the public projection");
+Check(server.PublicEntries.Count==0,"Private deployments publish no plaintext catalog");
 static void Check(bool valid,string message){if(!valid)throw new Exception(message);Console.WriteLine("PASS "+message);}
 static void Reject(Action action,string message){try{action();throw new Exception(message+" was accepted");}catch(CryptographicException){Console.WriteLine("PASS "+message);}}
 
 sealed class VaultServer:HttpMessageHandler
 {
+    public bool PublishEnabled {get;init;}
+    public Dictionary<Guid,PublicEdition> PublicEntries {get;}=[];
+    public Dictionary<string,byte[]> PublicCovers {get;}=[];
+    public string LastPublicBody {get;private set;}="";
     public Dictionary<Guid,VaultEntry> Entries {get;}=[];
     public Dictionary<string,byte[]> Covers {get;}=[];
     public string LastBody {get;private set;}="";
@@ -67,6 +82,14 @@ sealed class VaultServer:HttpMessageHandler
     {
         if(request.Headers.Authorization?.Scheme!="Bearer" || !request.Headers.Contains("X-Starfleet-Vault"))return new(HttpStatusCode.Unauthorized);
         var path=request.RequestUri!.AbsolutePath;
+        if(path=="/v1/publication")return new(HttpStatusCode.OK){Content=JsonContent.Create(new PublicPublication(PublishEnabled,PublicEntries.Values.Select(x=>new PublicRevision(x.Id,x.Revision)).ToArray()),PublicJson.Context.PublicPublication)};
+        if(path=="/v1/public/entries")
+        {
+            LastPublicBody=await request.Content!.ReadAsStringAsync(ct);
+            var edition=await request.Content.ReadFromJsonAsync(PublicJson.Context.PublicEdition,ct) ?? throw new Exception("Missing public edition");
+            PublicEntries[edition.Id]=edition;return new(HttpStatusCode.OK){Content=new StringContent("{}")};
+        }
+        if(path.StartsWith("/v1/public/covers/")){PublicCovers[path.Split('/')[^1]]=await request.Content!.ReadAsByteArrayAsync(ct);return new(HttpStatusCode.NoContent);}
         if(path=="/v1/entries")
         {
             if(request.Method==HttpMethod.Get)return new(HttpStatusCode.OK){Content=JsonContent.Create(Entries.Values.ToArray(),PrivateJson.Context.VaultEntryArray)};

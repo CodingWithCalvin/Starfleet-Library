@@ -38,12 +38,13 @@ async function showGate(message = '') {
   $('gate').hidden = false;
   $('library').hidden = true;
   for (const id of ['pair-form', 'unlock-form', 'login-form', 'legacy-unlock', 'retry-login']) $(id).hidden = true;
-  $('gate-title').textContent = 'Sign in to your library.';
+  $('gate-title').textContent = 'Loading your library.';
   $('gate-status').textContent = message || 'Connecting to your library…';
   try {
     const response = await request('/reader/login-info', null);
     const info = await response.json();
     if (version !== gateVersion || active) return;
+    if (info.public) { await connect({public: true}); return; }
     login = info;
     $('login-form').hidden = !login.enabled;
     $('pair-form').hidden = !!login.enabled;
@@ -58,7 +59,7 @@ async function showGate(message = '') {
   }
 }
 function authHeaders(context) {
-  return context ? {Authorization: 'Bearer ' + context.token, 'X-Starfleet-Vault': context.vaultId} : {};
+  return context && !context.public ? {Authorization: 'Bearer ' + context.token, 'X-Starfleet-Vault': context.vaultId} : {};
 }
 async function request(path, context, options = {}) {
   let response;
@@ -79,9 +80,10 @@ async function request(path, context, options = {}) {
   return response;
 }
 async function readEntries(context) {
-  const response = await request('/reader/v1/entries', context);
+  const response = await request(context.public ? '/public/entries' : '/reader/v1/entries', context);
   const wire = await response.json();
   if (!Array.isArray(wire)) throw new Error('The service returned an invalid catalog.');
+  if (context.public) return wire.filter(row => row.book != null);
   try {
     const decrypted = [];
     for (let i = 0; i < wire.length; i += 32) decrypted.push(...await Promise.all(wire.slice(i, i + 32).map(row => context.crypto.entry(row))));
@@ -91,7 +93,8 @@ async function readEntries(context) {
   }
 }
 async function connect(settings) {
-  const context = {token: settings.token, vaultId: settings.vaultId, controller: new AbortController(), crypto: await vaultCrypto(settings)};
+  const context = settings.public ? {public: true, controller: new AbortController()} :
+    {token: settings.token, vaultId: settings.vaultId, controller: new AbortController(), crypto: await vaultCrypto(settings)};
   const books = await readEntries(context);
   active = context;
   entries = books;
@@ -100,6 +103,9 @@ async function connect(settings) {
   $('library').hidden = false;
   $('gate-status').textContent = '';
   $('library-status').textContent = '';
+  $('lock').hidden = $('forget').hidden = $('reading-filter').hidden = !!context.public;
+  $('newest-sort').hidden = !!context.public;
+  $('access-label').textContent = context.public ? 'Public, read-only access' : 'Private, read-only access';
   render();
   $('main').focus();
 }
@@ -256,9 +262,15 @@ async function coverUrl(hash, context) {
   if (coverUrls.has(hash)) return coverUrls.get(hash);
   if (!coverRequests.has(hash)) {
     const pending = (async () => {
-      const id = await context.crypto.coverId(hash);
-      const response = await request('/reader/v1/covers/' + id, context);
-      const bytes = await context.crypto.cover(new Uint8Array(await response.arrayBuffer()), id, hash);
+      let bytes;
+      if (context.public) {
+        const response = await request('/public/covers/' + hash, context);
+        bytes = new Uint8Array(await response.arrayBuffer());
+      } else {
+        const id = await context.crypto.coverId(hash);
+        const response = await request('/reader/v1/covers/' + id, context);
+        bytes = await context.crypto.cover(new Uint8Array(await response.arrayBuffer()), id, hash);
+      }
       if (active !== context) return null;
       const url = URL.createObjectURL(new Blob([bytes], {type: imageType(bytes)}));
       coverUrls.set(hash, url);
@@ -331,14 +343,14 @@ function render() {
     const table = element('table');
     const head = element('thead');
     const row = element('tr');
-    for (const title of ['Title', 'Author', 'Series', 'Format', 'ISBN', 'Reading']) row.append(element('th', '', title));
+    for (const title of ['Title', 'Author', 'Series', 'Format', 'ISBN', ...(active.public ? [] : ['Reading'])]) row.append(element('th', '', title));
     head.append(row); table.append(head);
     const body = element('tbody');
     for (const entry of visible) {
       const row = element('tr');
       const title = element('td');
       const button = bookButton(entry, 'title-link'); button.textContent = entry.book.title; title.append(button); row.append(title);
-      for (const value of [entry.book.authors, catalogLabel(entry.book), formats[entry.book.format], entry.book.isbn || '—', readingStates[entry.book.readingStatus]]) row.append(element('td', '', value));
+      for (const value of [entry.book.authors, catalogLabel(entry.book), formats[entry.book.format], entry.book.isbn || '—', ...(active.public ? [] : [readingStates[entry.book.readingStatus]])]) row.append(element('td', '', value));
       body.append(row);
     }
     table.append(body); fragment.append(table);
@@ -405,8 +417,8 @@ function openDetails(entry, push = true) {
   info.append(heading);
   const facts = element('dl', 'detail-facts');
   for (const [label, value] of [['Format', formats[book.format]], ['Series', seriesNames[book.series]], ['ISBN', book.isbn], ['Book number', book.bookNumber], ['Publisher', book.publisher], ['Published', book.publicationYear], ['Edition', book.edition], ['Reading', readingStates[book.readingStatus]], ['Pages', book.pageCount ? `${book.currentPage} / ${book.pageCount}` : ''], ['Rating', book.rating ? `${book.rating} / 5` : '']]) {
-    if (!value) continue;
-    const group = element('div'); group.append(element('dt', '', label), element('dd', '', value)); facts.append(group);
+    if (!value || (active.public && ['Reading','Rating'].includes(label))) continue;
+    const group = element('div'); group.append(element('dt', '', label), element('dd', '', active.public && label === 'Pages' ? String(book.pageCount) : value)); facts.append(group);
   }
   info.append(facts); content.append(info);
   const others = entries.filter(row => row.id !== entry.id && row.book.title.trim().toLowerCase() === book.title.trim().toLowerCase());

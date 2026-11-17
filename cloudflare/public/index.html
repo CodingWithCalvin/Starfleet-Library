@@ -18,12 +18,12 @@
       <p class="eyebrow">STARFLEET LIBRARY</p>
       <h1>Your next adventure.<br> Already on your shelf?</h1>
       <p>Your collection and wishlist, wherever you explore.</p>
-      <span class="private-badge">PRIVATE LIBRARY · READ ONLY</span>
+      <span class="private-badge">COLLECTION · WISHLIST</span>
     </div>
     <div class="gate-content">
       <div class="gate-card">
         <p class="eyebrow accent">WELCOME ABOARD</p>
-        <h2 id="gate-title">Sign in to your library.</h2>
+        <h2 id="gate-title">Loading your library.</h2>
         <form id="login-form" hidden>
           <p>Your collection is a password away. Sign in from any browser, wherever you are.</p>
           <input type="hidden" name="username" value="Starfleet Library" autocomplete="username">
@@ -71,7 +71,7 @@
         <button id="collection-tab" class="nav-button active" aria-current="page"><span>Collection</span><span id="collection-count" class="count">0</span></button>
         <button id="wishlist-tab" class="nav-button"><span>Wishlist</span><span id="wishlist-count" class="count">0</span></button>
       </nav>
-      <div class="sidebar-footer"><span class="signal"></span> Private, read-only access<p>Make changes in the Windows<br>or iPhone app.</p></div>
+      <div class="sidebar-footer"><span class="signal"></span> <span id="access-label">Read-only access</span><p>Make changes in the Windows<br>or iPhone app.</p></div>
     </aside>
     <main id="main" tabindex="-1">
       <header class="topbar"><span class="eyebrow">PERSONAL ARCHIVES</span><div class="actions"><button id="refresh" class="quiet">↻ Refresh</button><button id="lock" class="quiet">Sign out</button></div></header>
@@ -85,8 +85,8 @@
         <label>Series<select id="series"><option value="">All series</option></select></label>
         <label>Format<select id="format"><option value="">All formats</option></select></label>
         <label>Type<select id="kind"><option value="">Books &amp; comics</option><option value="0">Books only</option><option value="1">Comics only</option></select></label>
-        <label>Reading<select id="reading"><option value="">All statuses</option></select></label>
-        <label>Sort by<select id="sort"><option value="title">Title A–Z</option><option value="author">Author</option><option value="series">Series / number</option><option value="newest">Recently added</option></select></label>
+        <label id="reading-filter">Reading<select id="reading"><option value="">All statuses</option></select></label>
+        <label>Sort by<select id="sort"><option value="title">Title A–Z</option><option value="author">Author</option><option value="series">Series / number</option><option id="newest-sort" value="newest">Recently added</option></select></label>
         <button id="clear" class="text-button">Reset filters</button>
       </div>
       <div class="result-summary"><p id="result-count" aria-live="polite"></p><p id="updated"></p></div>

@@ -11,7 +11,7 @@ const id='7e3fce9e-e1e3-4bdf-a7f5-5bf74d0d63cd';
 const bytes=Buffer.concat([Buffer.from([1]),Buffer.alloc(40,8)]);
 async function fixture(){
  const db=new DatabaseSync(':memory:');
- for(const name of ['0001_encrypted_vault.sql','0002_reader_sessions.sql','0003_reader_password.sql'])db.exec(readFileSync(new URL('../cloudflare/migrations/'+name,import.meta.url),'utf8'));
+ for(const name of ['0001_encrypted_vault.sql','0002_reader_sessions.sql','0003_reader_password.sql','0004_public_catalog.sql'])db.exec(readFileSync(new URL('../cloudflare/migrations/'+name,import.meta.url),'utf8'));
  const blobs=new Map();
  return {VAULT_ID:vault,DEVICE_TOKEN_HASHES:Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token))).toString('hex'),LOGIN_RATE_LIMITER:{async limit(){return {success:true};}},
  DB:{prepare(sql){let values=[];return {bind(...args){values=args;return this;},async first(){return db.prepare(sql).get(...values)??null;},async run(){return db.prepare(sql).run(...values);},async all(){return {results:db.prepare(sql).all(...values)};}};}},
@@ -182,4 +182,53 @@ test('password resets revoke prior password sessions and expired sessions need o
  assert.equal((await worker.fetch(browserRequest(current,'/reader/session/revoke','POST'),env)).status,204);
  assert.equal((await worker.fetch(browserRequest(current,'/reader/v1/entries'),env)).status,401);
  assert.equal((await worker.fetch(request('/v1/entries'),env)).status,200);
+});
+
+const publicBook=Object.fromEntries(['id','title','authors','series','bookNumber','isbn','publisher','publicationYear','edition','format','kind','ownership','pageCount'].map(key=>[key,sample.book[key]]));
+const seedPublic=async env=>{
+ await env.DB.prepare('INSERT INTO vault_entries(id,revision,ciphertext) VALUES(?,?,?)').bind(sample.entry.id,sample.entry.revision,sample.entry.ciphertext).run();
+ const edition={id:sample.entry.id,revision:sample.entry.revision,book:publicBook,cover:sample.coverHash};
+ const cover=await worker.fetch(request('/v1/public/covers/'+sample.coverHash,'PUT',Buffer.from(sample.image,'base64')),env);assert.equal(cover.status,204);
+ assert.equal((await worker.fetch(request('/v1/public/entries','POST',JSON.stringify(edition)),env)).status,200);
+ return edition;
+};
+
+test('public viewing serves only the separately published book fields and covers, with no credentials',async()=>{
+ const env={...await fixture(),PUBLIC_READER_ENABLED:'true'};
+ const edition=await seedPublic(env);
+ assert.deepEqual(await (await worker.fetch(new Request('https://vault.test/reader/login-info'),env)).json(),{public:true});
+ const response=await worker.fetch(new Request('https://vault.test/public/entries'),env);assert.equal(response.status,200);
+ const rows=await response.json();assert.deepEqual(rows,[edition]);
+ for(const forbidden of ['notes','readingStatus','currentPage','rating','addedAt','finishedAt','coverUrl','ciphertext','encryptionKey','deviceToken'])assert.ok(!Object.hasOwn(rows[0].book,forbidden));
+ const cover=await worker.fetch(new Request('https://vault.test/public/covers/'+sample.coverHash),env);
+ assert.equal(cover.status,200);assert.equal(cover.headers.get('Content-Type'),'image/png');assert.equal(Buffer.from(await cover.arrayBuffer()).toString('base64'),sample.image);
+ assert.equal((await worker.fetch(new Request('https://vault.test/v1/entries'),env)).status,401);
+ assert.equal((await worker.fetch(new Request('https://vault.test/reader/v1/entries'),env)).status,401);
+});
+
+test('public browsing cannot publish, write, expose extra fields or read unpublished images',async()=>{
+ const env={...await fixture(),PUBLIC_READER_ENABLED:'true'};const edition=await seedPublic(env);
+ for(const [path,method] of [['/public/entries','POST'],['/public/entries','DELETE'],['/public/covers/'+sample.coverHash,'PUT']]) {
+  assert.equal((await worker.fetch(new Request('https://vault.test'+path,{method,body:'{}'}),env)).status,405);
+ }
+ for(const path of ['/v1/public/entries','/v1/entries'])assert.equal((await worker.fetch(new Request('https://vault.test'+path,{method:'POST',body:'{}'}),env)).status,401);
+ const session=await pair(env);assert.equal((await worker.fetch(browserRequest(session,'/v1/public/entries','POST',JSON.stringify(edition)),env)).status,401);
+ for(const field of ['notes','rating','readingStatus','addedAt','encryptionKey','coverUrl'])assert.equal((await worker.fetch(request('/v1/public/entries','POST',JSON.stringify({...edition,book:{...publicBook,[field]:'private'}})),env)).status,400);
+ assert.equal((await worker.fetch(request('/v1/public/covers/'+'a'.repeat(64),'PUT',Buffer.from(sample.image,'base64')),env)).status,400);
+ assert.equal((await worker.fetch(new Request('https://vault.test/public/covers/'+'a'.repeat(64)),env)).status,404);
+ const privateEnv={...env,PUBLIC_READER_ENABLED:'false'};
+ assert.equal((await worker.fetch(new Request('https://vault.test/public/entries'),privateEnv)).status,404);
+ assert.deepEqual(await (await worker.fetch(request('/v1/publication'),privateEnv)).json(),{enabled:false,entries:[]});
+ assert.equal((await worker.fetch(request('/v1/public/entries','POST',JSON.stringify(edition)),privateEnv)).status,404);
+});
+
+test('stale public editions disappear after a native change and cannot overwrite newer revisions',async()=>{
+ const env={...await fixture(),PUBLIC_READER_ENABLED:'true'};const edition=await seedPublic(env);
+ await env.DB.prepare('UPDATE vault_entries SET revision=revision+1 WHERE id=?').bind(edition.id).run();
+ assert.deepEqual(await (await worker.fetch(new Request('https://vault.test/public/entries'),env)).json(),[]);
+ assert.equal((await worker.fetch(request('/v1/public/entries','POST',JSON.stringify(edition)),env)).status,409);
+ const removed={...edition,revision:edition.revision+1,book:null,cover:null};
+ assert.equal((await worker.fetch(request('/v1/public/entries','POST',JSON.stringify(removed)),env)).status,200);
+ assert.deepEqual(await (await worker.fetch(new Request('https://vault.test/public/entries'),env)).json(),[]);
+ assert.equal((await worker.fetch(new Request('https://vault.test/public/covers/'+sample.coverHash),env)).status,404);
 });

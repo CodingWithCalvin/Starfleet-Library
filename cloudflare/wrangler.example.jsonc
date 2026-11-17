@@ -7,6 +7,8 @@
   "compatibility_date": "2026-05-15",
   "workers_dev": true,
   "preview_urls": false,
+  // Optional: publish a limited book/ownership catalog without a browser login.
+  "vars": { "PUBLIC_READER_ENABLED": "false" },
   "ratelimits": [{
     "name": "LOGIN_RATE_LIMITER",
     "namespace_id": "1001",
