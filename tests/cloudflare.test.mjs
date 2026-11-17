@@ -3,15 +3,17 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
 import worker from '../cloudflare/worker.js';
+import {preparePasswordLogin, deriveLogin, unlockPasswordKey} from '../cloudflare/public/password.js';
+import {vaultCrypto} from '../cloudflare/public/crypto.js';
 const token=Buffer.alloc(32,7).toString('base64');
 const vault='a1d3787e-8d62-42c5-896f-75df6617911a';
 const id='7e3fce9e-e1e3-4bdf-a7f5-5bf74d0d63cd';
 const bytes=Buffer.concat([Buffer.from([1]),Buffer.alloc(40,8)]);
 async function fixture(){
  const db=new DatabaseSync(':memory:');
- for(const name of ['0001_encrypted_vault.sql','0002_reader_sessions.sql'])db.exec(readFileSync(new URL('../cloudflare/migrations/'+name,import.meta.url),'utf8'));
+ for(const name of ['0001_encrypted_vault.sql','0002_reader_sessions.sql','0003_reader_password.sql'])db.exec(readFileSync(new URL('../cloudflare/migrations/'+name,import.meta.url),'utf8'));
  const blobs=new Map();
- return {VAULT_ID:vault,DEVICE_TOKEN_HASHES:Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token))).toString('hex'),
+ return {VAULT_ID:vault,DEVICE_TOKEN_HASHES:Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token))).toString('hex'),LOGIN_RATE_LIMITER:{async limit(){return {success:true};}},
  DB:{prepare(sql){let values=[];return {bind(...args){values=args;return this;},async first(){return db.prepare(sql).get(...values)??null;},async run(){return db.prepare(sql).run(...values);},async all(){return {results:db.prepare(sql).all(...values)};}};}},
  BUCKET:{async head(k){return blobs.get(k);},async get(k){return blobs.get(k);},async put(k,body,metadata){blobs.set(k,{body,...metadata});}}};
 }
@@ -108,4 +110,76 @@ test('covers stay opaque and require authorization for reads and writes',async()
  const response=await worker.fetch(request(path),env);assert.equal(response.headers.get('Content-Type'),'application/octet-stream');assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes);
  assert.equal((await worker.fetch(request(path,'PUT',Buffer.from('plain image')),env)).status,400);
  assert.equal((await worker.fetch(request(path,'GET',undefined,{Authorization:'Bearer invalid'}),env)).status,401);
+});
+
+const sample=JSON.parse(readFileSync(new URL('./fixtures/browser-vault.json',import.meta.url),'utf8'));
+const password='synthetic private library password';
+const setup=async(env,previous=null,newPassword=password)=>{
+ const prepared=await preparePasswordLogin(sample.settings,newPassword,'https://vault.test',previous);
+ const response=await worker.fetch(request('/reader/password','POST',JSON.stringify(prepared.setup),{Origin:'https://vault.test'}),env);
+ assert.equal(response.status,200);return prepared;
+};
+const loginRequest=(prepared,auth=prepared.keys.auth,extra={})=>new Request('https://vault.test/reader/login',{method:'POST',headers:{Origin:'https://vault.test','Content-Type':'application/json',...extra},body:JSON.stringify({id:prepared.info.id,auth})});
+
+test('a fresh browser signs in using only its password and decrypts the native catalog',async()=>{
+ const env=await fixture();
+ assert.deepEqual(await (await worker.fetch(new Request('https://vault.test/reader/login-info'),env)).json(),{enabled:false,id:null});
+ const prepared=await setup(env);
+ const info=await (await worker.fetch(new Request('https://vault.test/reader/login-info'),env)).json();
+ assert.deepEqual(Object.keys(info).sort(),['enabled','id','salt','vaultId','version']);
+ const keys=await deriveLogin(password,info,'https://vault.test');
+ const response=await worker.fetch(loginRequest(prepared,keys.auth),env);assert.equal(response.status,200);
+ const session=await response.json();const unlocked=await unlockPasswordKey(session.wrappedKey,keys,info,'https://vault.test');
+ assert.deepEqual(unlocked,{vaultId:vault,encryptionKey:sample.settings.encryptionKey});
+ await env.DB.prepare('INSERT INTO vault_entries(id,revision,ciphertext) VALUES(?,?,?)').bind(sample.entry.id,sample.entry.revision,sample.entry.ciphertext).run();
+ const catalog=await (await worker.fetch(browserRequest(session,'/reader/v1/entries'),env)).json();
+ const cipher=await vaultCrypto(unlocked);assert.deepEqual((await cipher.entry(catalog[0])).book,sample.book);
+ for(const path of ['/reader/v1/entries','/v1/entries','/reader/password'])assert.notEqual((await worker.fetch(browserRequest(session,path,'POST','{}'),env)).status,200);
+ const stored=(await env.DB.prepare('SELECT * FROM reader_login').first());
+ for(const secret of [password,keys.auth,sample.settings.encryptionKey,token])assert.ok(!JSON.stringify(stored).includes(secret));
+ assert.ok(!JSON.stringify(prepared.setup).includes(sample.settings.encryptionKey));
+});
+
+test('password setup requires native credentials, validates opaque input and refuses stale replacements',async()=>{
+ const env=await fixture();const prepared=await preparePasswordLogin(sample.settings,password,'https://vault.test',null);
+ const body=JSON.stringify(prepared.setup);
+ assert.equal((await worker.fetch(new Request('https://vault.test/reader/password',{method:'POST',headers:{Origin:'https://vault.test'},body}),env)).status,401);
+ const session=await pair(env);assert.equal((await worker.fetch(browserRequest(session,'/reader/password','POST',body),env)).status,401);
+ assert.equal((await worker.fetch(request('/reader/password','POST',body,{Origin:'https://other.test'}),env)).status,403);
+ for(const data of [{...prepared.setup,encryptionKey:sample.settings.encryptionKey},{...prepared.setup,wrappedKey:'plain key'},{...prepared.setup,salt:'bad'},null,[]]) {
+  assert.equal((await worker.fetch(request('/reader/password','POST',JSON.stringify(data),{Origin:'https://vault.test'}),env)).status,400);
+ }
+ assert.equal((await worker.fetch(request('/reader/password','POST','x'.repeat(4097),{Origin:'https://vault.test'}),env)).status,413);
+ assert.equal((await worker.fetch(request('/reader/password','POST',body,{Origin:'https://vault.test'}),env)).status,200);
+ assert.equal((await worker.fetch(request('/reader/password','POST',body,{Origin:'https://vault.test'}),env)).status,409);
+});
+
+test('wrong passwords, cross-origin sign-in and unavailable rate limits fail closed',async()=>{
+ const env=await fixture();const prepared=await setup(env);
+ const wrong=await deriveLogin('a different synthetic password',prepared.info,'https://vault.test');
+ const failed=await worker.fetch(loginRequest(prepared,wrong.auth),env);assert.equal(failed.status,401);assert.deepEqual(Object.keys(await failed.json()),['error']);
+ assert.equal((await env.DB.prepare('SELECT * FROM reader_sessions').all()).results.length,0);
+ assert.equal((await worker.fetch(loginRequest(prepared,prepared.keys.auth,{Origin:'https://other.test'}),env)).status,403);
+ assert.equal((await worker.fetch(loginRequest(prepared),{...env,LOGIN_RATE_LIMITER:undefined})).status,503);
+ const limited=await worker.fetch(loginRequest(prepared),{...env,LOGIN_RATE_LIMITER:{async limit(){return {success:false};}}});assert.equal(limited.status,429);assert.equal(limited.headers.get('Retry-After'),'60');
+ assert.equal((await worker.fetch(request('/reader/login','POST','x'.repeat(1025),{Origin:'https://vault.test'}),env)).status,413);
+ assert.equal((await worker.fetch(loginRequest(prepared),{...env,DEVICE_TOKEN_HASHES:'b'.repeat(64)})).status,401);
+ assert.equal((await worker.fetch(loginRequest(prepared),{...env,VAULT_ID:id})).status,401);
+});
+
+test('password resets revoke prior password sessions and expired sessions need only the password again',async()=>{
+ const env=await fixture();const original=await setup(env);
+ const first=await (await worker.fetch(loginRequest(original),env)).json();
+ await env.DB.prepare('UPDATE reader_sessions SET expires_at=0').run();
+ assert.equal((await worker.fetch(browserRequest(first,'/reader/v1/entries'),env)).status,401);
+ const second=await (await worker.fetch(loginRequest(original),env)).json();
+ assert.equal((await worker.fetch(browserRequest(second,'/reader/v1/entries'),env)).status,200);
+ const changed=await setup(env,original.info.id,'another synthetic library password');
+ assert.equal((await worker.fetch(browserRequest(second,'/reader/v1/entries'),env)).status,401);
+ assert.equal((await worker.fetch(loginRequest(original),env)).status,401);
+ const current=await (await worker.fetch(loginRequest(changed),env)).json();
+ assert.equal((await worker.fetch(browserRequest(current,'/reader/v1/entries'),env)).status,200);
+ assert.equal((await worker.fetch(browserRequest(current,'/reader/session/revoke','POST'),env)).status,204);
+ assert.equal((await worker.fetch(browserRequest(current,'/reader/v1/entries'),env)).status,401);
+ assert.equal((await worker.fetch(request('/v1/entries'),env)).status,200);
 });

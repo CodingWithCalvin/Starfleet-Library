@@ -1,4 +1,5 @@
 import {json, securityHeaders, sameOrigin, readerSession, createSession, publicAsset, digest} from './reader.js';
+import {loginInfo, configureLogin, passwordLogin} from './password-login.js';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const hash = /^[a-f0-9]{64}$/;
 const equal = (a,b) => { if(a.length!==b.length)return false; let diff=0;for(let i=0;i<a.length;i++)diff|=a.charCodeAt(i)^b.charCodeAt(i);return diff===0; };
@@ -23,6 +24,18 @@ export default {async fetch(request,env) {
     const asset=await publicAsset(request,env);if(asset)return asset;
     if(path.startsWith('/reader/')) {
       if(!sameOrigin(request,request.method!=='GET'))return json({error:'Same-origin access required'},403);
+      if(path==='/reader/login-info' && request.method==='GET')return await loginInfo(env);
+      if(path==='/reader/login' && request.method==='POST') {
+        const data=JSON.parse(new TextDecoder().decode(await readBounded(request,1024)));
+        if(!data || typeof data!=='object' || Array.isArray(data))return json({error:'Invalid sign-in request'},400);
+        return await passwordLogin(request,env,data);
+      }
+      if(path==='/reader/password' && request.method==='POST') {
+        if(!await authorized(request,env))return json({error:'Unauthorized'},401);
+        const data=JSON.parse(new TextDecoder().decode(await readBounded(request,4096)));
+        if(!data || typeof data!=='object' || Array.isArray(data))return json({error:'Invalid password setup'},400);
+        return await configureLogin(env,await digest(request.headers.get('Authorization').slice(7)),data);
+      }
       if(path==='/reader/session' && request.method==='POST') {
         if(!await authorized(request,env))return json({error:'Unauthorized'},401);
         return await createSession(env,await digest(request.headers.get('Authorization').slice(7)));

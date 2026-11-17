@@ -16,35 +16,46 @@
     <div class="welcome">
       <img src="/logo.svg" alt="" width="224" height="224">
       <p class="eyebrow">STARFLEET LIBRARY</p>
-      <h1>Your next adventure.<br>Already on your shelf?</h1>
+      <h1>Your next adventure.<br> Already on your shelf?</h1>
       <p>Your collection and wishlist, wherever you explore.</p>
       <span class="private-badge">PRIVATE LIBRARY · READ ONLY</span>
     </div>
     <div class="gate-content">
       <div class="gate-card">
         <p class="eyebrow accent">WELCOME ABOARD</p>
-        <h2 id="gate-title">Bring your library along.</h2>
-        <form id="pair-form">
-          <p>In the Windows app, open <strong>Settings → Show iPhone connection code</strong>. The same code connects this browser.</p>
+        <h2 id="gate-title">Sign in to your library.</h2>
+        <form id="login-form" hidden>
+          <p>Your collection is a password away. Sign in from any browser, wherever you are.</p>
+          <input type="hidden" name="username" value="Starfleet Library" autocomplete="username">
+          <label for="library-password">Library password</label>
+          <input id="library-password" name="password" type="password" required maxlength="1024" autocomplete="current-password">
+          <button type="submit" class="primary full">Sign in <span aria-hidden="true">→</span></button>
+          <button id="show-setup" type="button" class="text-button">Set up or reset library password</button>
+        </form>
+        <form id="pair-form" hidden>
+          <p><strong>One-time setup.</strong> Paste your private connection code and choose a library password. After this, sign in from any browser with just that password—no Windows app needed.</p>
+          <p class="hint">Get the code once from Windows app <strong>Settings → Show iPhone connection code</strong>, or use the recovery copy in your password manager.</p>
           <label for="connection">Private connection code</label>
           <textarea id="connection" rows="3" required maxlength="8192" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="starfleet-v1:…"></textarea>
-          <label class="check"><input id="remember" type="checkbox"> Remember this browser with a password</label>
-          <div id="password-fields" hidden>
-            <label for="new-password">Create a browser password</label>
-            <input id="new-password" type="password" minlength="10" autocomplete="new-password" placeholder="At least 10 characters">
+          <div id="password-fields">
+            <label for="new-password">Choose a library password</label>
+            <input id="new-password" type="password" required minlength="14" maxlength="1024" autocomplete="new-password" placeholder="At least 14 characters">
             <label for="confirm-password">Confirm password</label>
-            <input id="confirm-password" type="password" minlength="10" autocomplete="new-password">
-            <p class="hint">Use a unique password. It protects the saved connection on this browser and never leaves your device.</p>
+            <input id="confirm-password" type="password" required minlength="14" maxlength="1024" autocomplete="new-password">
+            <p class="hint">Save this unique password in your password manager. It protects your encrypted library key and never leaves your device. Resetting it signs out other password sessions.</p>
           </div>
-          <button type="submit" class="primary full">Open my library <span aria-hidden="true">→</span></button>
+          <button type="submit" class="primary full">Save password and open library <span aria-hidden="true">→</span></button>
+          <button id="cancel-setup" type="button" class="text-button" hidden>Back to sign in</button>
         </form>
         <form id="unlock-form" hidden>
-          <p>Your connection is saved securely in this browser. Enter your browser password to open it.</p>
+          <p>This browser has a connection saved using the previous setup. You can still unlock it here, or set up a library password to sign in from other browsers.</p>
           <label for="password">Browser password</label>
           <input id="password" type="password" required autocomplete="current-password">
           <button type="submit" class="primary full">Unlock library <span aria-hidden="true">→</span></button>
           <button id="forget-locked" type="button" class="text-button">Forget this browser and pair again</button>
         </form>
+        <button id="legacy-unlock" type="button" class="text-button" hidden>Use a previously saved browser connection</button>
+        <button id="retry-login" type="button" class="quiet" hidden>Retry connection</button>
         <p id="gate-status" class="status" role="status" aria-live="polite"></p>
         <p class="privacy-note">Your books and covers are decrypted on this device. Browsing cannot change your collection or wishlist.</p>
         <noscript>This private reader needs JavaScript to decrypt and display your library.</noscript>
@@ -63,7 +74,7 @@
       <div class="sidebar-footer"><span class="signal"></span> Private, read-only access<p>Make changes in the Windows<br>or iPhone app.</p></div>
     </aside>
     <main id="main" tabindex="-1">
-      <header class="topbar"><span class="eyebrow">PERSONAL ARCHIVES</span><div class="actions"><button id="refresh" class="quiet">↻ Refresh</button><button id="lock" class="quiet">Lock library</button></div></header>
+      <header class="topbar"><span class="eyebrow">PERSONAL ARCHIVES</span><div class="actions"><button id="refresh" class="quiet">↻ Refresh</button><button id="lock" class="quiet">Sign out</button></div></header>
       <div class="page-heading"><div><h1 id="section-title">Collection</h1><p id="section-description">Every edition. Every adventure. All in one place.</p></div><span class="pill">READ ONLY</span></div>
       <div class="toolbar">
         <label class="search"><span class="sr-only">Search title, author, or ISBN</span><input id="search" type="search" placeholder="Search title, author, or ISBN…" autocomplete="off"></label>

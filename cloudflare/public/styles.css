@@ -649,7 +649,9 @@ color:#8b4e36}
 }
 @media(max-width:700px){
   .gate{
-  grid-template-columns:1fr}
+    grid-template-columns:1fr;
+    grid-template-rows:auto 1fr;
+  }
   .welcome{
     padding:26px 24px;
     display:grid;
@@ -794,3 +796,5 @@ display:none}
   .filters:not(.expanded){
   display:none}
 }
+
+#login-form .primary { margin-top: 22px; }

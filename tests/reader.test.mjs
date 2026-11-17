@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {parseConnection, vaultCrypto, fromBase64, toBase64, sealConnection, openConnection} from '../cloudflare/public/crypto.js';
 import {filterBooks, catalogLabel} from '../cloudflare/public/catalog.js';
+import {preparePasswordLogin, deriveLogin, unlockPasswordKey} from '../cloudflare/public/password.js';
 const fixture=JSON.parse(readFileSync(new URL('./fixtures/browser-vault.json',import.meta.url),'utf8'));
 const code='starfleet-v1:'+Buffer.from(JSON.stringify(fixture.settings)).toString('base64');
 
@@ -67,4 +68,21 @@ test('catalog search and filters distinguish comics, SNW, ownership and duplicat
  assert.deepEqual(filterBooks(entries,{...filters,ownership:1}).map(x=>x.id),['d']);
  assert.equal(catalogLabel(entries[2].book),'COMIC · SNW');
  assert.equal(filterBooks(entries,{...filters,search:'missing'}).length,0);
+});
+
+test('password login separates authentication from key wrapping and binds ciphertext to origin and login',async()=>{
+ const prepared=await preparePasswordLogin(fixture.settings,'synthetic private library password','https://vault.test',null);
+ const settings=await unlockPasswordKey(prepared.setup.wrappedKey,prepared.keys,prepared.info,'https://vault.test');
+ assert.equal(settings.encryptionKey,fixture.settings.encryptionKey);
+ assert.equal(Object.hasOwn(settings,'deviceToken'),false);
+ await assert.rejects(preparePasswordLogin(fixture.settings,'short','https://vault.test',null));
+ const wrong=await deriveLogin('wrong synthetic password',prepared.info,'https://vault.test');
+ assert.notEqual(wrong.auth,prepared.keys.auth);
+ await assert.rejects(unlockPasswordKey(prepared.setup.wrappedKey,wrong,prepared.info,'https://vault.test'));
+ await assert.rejects(unlockPasswordKey(prepared.setup.wrappedKey,prepared.keys,prepared.info,'https://other.test'));
+ await assert.rejects(unlockPasswordKey(prepared.setup.wrappedKey,prepared.keys,{...prepared.info,id:fixture.entry.id},'https://vault.test'));
+ const authAsKey=await crypto.subtle.importKey('raw',fromBase64(prepared.keys.auth),'AES-GCM',false,['decrypt']);
+ await assert.rejects(unlockPasswordKey(prepared.setup.wrappedKey,{wrappingKey:authAsKey},prepared.info,'https://vault.test'));
+ const damaged=fromBase64(prepared.setup.wrappedKey);damaged[damaged.length-1]^=1;
+ await assert.rejects(unlockPasswordKey(toBase64(damaged),prepared.keys,prepared.info,'https://vault.test'));
 });

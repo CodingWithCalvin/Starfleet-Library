@@ -31,15 +31,19 @@ See the [iPhone sideloading instructions](docs/NATIVE-IOS.md#sideload-on-your-ip
 
 After configuring Cloudflare below, open **your own Worker HTTPS address** in a desktop or phone browser. The root address serves the reader; there is no separate Pages deployment or ChatGPT-hosted component.
 
-1. In the Windows app, open **Settings → Show iPhone connection code**. This existing code also pairs the browser.
-2. Paste it into **Private connection code** at your Worker address and select **Open my library**.
-3. Optionally choose **Remember this browser with a password**. Create a unique password of at least 10 characters; it encrypts the saved browser connection locally. Without this option, refreshing or closing the page requires pairing again.
+1. **Once, to enable password sign-in:** copy **Settings → Show iPhone connection code** from the Windows app, or use your existing recovery copy. Paste it into **Private connection code** at your Worker address.
+2. Choose a unique **library password** of at least 14 characters and select **Save password and open library**. Save the password and recovery connection code in your password manager.
+3. **After setup, on any browser or phone:** open your Worker address and enter only your library password. The Windows app does not need to be running or accessible, and a new browser does not need a connection code. The site reads the latest catalog already synced to Cloudflare.
 
 The reader can browse Collection and Wishlist, search titles/authors/ISBNs, exclude comics, switch between Covers/Cards/Table, and open edition details. The visible Back button and browser Back preserve the search, filters, layout, and list position. On phones, expand **Filters** when needed. Use **Refresh** to see newly synced changes; adding or editing books and camera scanning remain in the native apps.
 
-The original connection code is exchanged for a separate **read-only token** that expires after 30 days. The native write token is not saved in browser storage. Catalog records and covers are decrypted with Web Crypto on the device; the encryption key and browser password never go to the Worker. Optional saved access contains only password-encrypted connection information, not a plaintext catalog or an unencrypted key. **Lock library** clears the displayed catalog and in-memory cover URLs. **Forget this browser** removes saved access and, when unlocked and online, revokes that browser token. If locked, forgetting only removes the local encrypted connection; the server token still expires automatically. Removing the parent device token hash also revokes all browser sessions paired with it.
+During setup, Web Crypto uses PBKDF2-SHA-256 (600,000 iterations) and HKDF with separate purposes to derive independent authentication and key-wrapping keys. The browser encrypts the library key with AES-256-GCM and uploads only that encrypted wrapper, a random salt, and a hash of the derived authentication proof. The wrapper is bound to the service origin, vault, and password-configuration ID. **The password, plaintext library key, and wrapping key never go to the Worker.** The native write token is used only to authorize initial setup or password reset; it is not included in the encrypted wrapper. Cloudflare stores the encrypted catalog, encrypted covers, and password-encrypted key, plus authentication hashes and operational metadata. A strong, unique password protects the stored wrapper against offline guessing if the database is exposed.
 
-This reader requires an internet connection to load the catalog and covers. It does not replace the native apps' offline storage. Keep your connection code in a password manager; a forgotten browser password is recovered by forgetting the browser and pairing again. Browser privacy depends on trusting the hosted reader code and the device running it; do not pair on a shared or untrusted computer.
+Each password sign-in obtains a separate **read-only session token** and decrypts the library key locally. No password or new password-session credentials are saved in local storage. Sessions expire after 30 days; expiry just requires entering your library password again, without the Windows app. **Sign out** clears the displayed catalog and cover URLs and revokes the session when online. Login attempts are rate limited using the `LOGIN_RATE_LIMITER` binding (10 attempts per minute per source IP, approximately, within each Cloudflare location). See [Cloudflare's rate limiting behavior](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/).
+
+Use **Set up or reset library password** and your recovery connection code to change a forgotten password. Password reset invalidates older password sessions on their next authenticated request; it does not change the catalog encryption key or native app credentials. Removing the parent native device token hash also revokes password access and its sessions. Existing connections saved using the original browser-only password remain available under **Use a previously saved browser connection**; that old password is local to one browser until you complete the new library-password setup.
+
+This reader requires an internet connection to load the catalog and covers. It does not replace the native apps' offline storage. Browser privacy depends on trusting the hosted reader code and the device running it; use a trusted browser and sign out when finished.
 
 ## Run the Windows app from source
 
@@ -60,10 +64,10 @@ Each deployment serves one private library shared between your devices. Forking 
 | Cloudflare resource | Purpose |
 | --- | --- |
 | Worker | Serves the browser reader's static files and authenticates private API requests over HTTPS. |
-| D1 database | Stores edition IDs, revisions, encrypted catalog records, and hashed expiring browser credentials. |
+| D1 database | Stores edition IDs, revisions, encrypted catalog records, the password-encrypted library key, and authentication/session hashes. |
 | R2 bucket | Stores encrypted cover images. |
 
-The apps encrypt catalog content and covers before upload. The decryption key stays on your devices. Cloudflare can still see operational metadata such as record IDs, revisions, sizes, and request timing. Keep the R2 bucket private; the apps access it through the authenticated Worker.
+The apps encrypt catalog content and covers before upload. The plaintext decryption key stays on your devices; enabling browser password sign-in stores an additional password-encrypted copy. Cloudflare can still see operational metadata such as record IDs, revisions, sizes, and request timing. Keep the R2 bucket private; the apps access it through the authenticated Worker.
 
 ### 1. Fork, clone, and install the tools
 
@@ -119,6 +123,8 @@ Edit `cloudflare/wrangler.jsonc` using the values from your account:
 
 Keep the binding names **`DB`**, **`BUCKET`**, and **`ASSETS`**, because the Worker uses those names. Keep the example's `assets` block, including `run_worker_first: true`, so security headers and API routing run before static asset serving. Keep `migrations_dir` set to `migrations`, `workers_dev` enabled, and `preview_urls` disabled. Do not enable public access on the R2 bucket.
 
+Keep the example's `ratelimits` block and **`LOGIN_RATE_LIMITER`** binding as well. Its `namespace_id` is a developer-chosen positive integer, not an account credential; choose a different value if another application in your account already uses that namespace. Password login fails closed if the binding is absent.
+
 After replacing the database ID, create the tables and deploy the Worker:
 
 ```powershell
@@ -147,7 +153,7 @@ npx wrangler secret put VAULT_ID --config cloudflare/wrangler.jsonc
 npx wrangler secret put DEVICE_TOKEN_HASHES --config cloudflare/wrangler.jsonc
 ```
 
-Cloudflare's configured secrets hold the vault ID and the token's SHA-256 hash. Apps send the access token over HTTPS for authentication; the decryption key is never uploaded. Store the printed values as [Worker secrets](https://developers.cloudflare.com/workers/configuration/secrets/), not in source files or your public README.
+Cloudflare's configured secrets hold the vault ID and the token's SHA-256 hash. Apps send the access token over HTTPS for authentication; the plaintext decryption key is never uploaded. Store the printed values as [Worker secrets](https://developers.cloudflare.com/workers/configuration/secrets/), not in source files or your public README.
 
 ### 5. Sync your catalog and pair the iPhone
 
@@ -172,7 +178,7 @@ The connection code contains the service URL and credentials needed to access an
 
 The included GitHub Actions workflows build the apps and test the sync service; **they do not deploy to Cloudflare**. Deploy service changes from your configured checkout with `npm run deploy`, applying new D1 migrations first when needed. Your basic setup does not require Cloudflare credentials in GitHub.
 
-To upgrade a deployment that previously served only the native API, copy the new `assets` block from the example into your ignored local config, apply D1 migrations (including `0002_reader_sessions.sql`), then deploy. This creates a separate browser-session table and leaves existing catalog records, covers, native credentials, and encryption keys intact. See [Cloudflare's static asset binding documentation](https://developers.cloudflare.com/workers/static-assets/binding/) for the asset configuration.
+To upgrade an older deployment, copy the `assets` and `ratelimits` blocks from the example into your ignored local config, apply D1 migrations (including `0002_reader_sessions.sql` and `0003_reader_password.sql`), then deploy. These add browser authentication storage and leave existing catalog records, covers, native credentials, and encryption keys intact. Deploying does not choose a library password: complete the one-time setup screen yourself afterward. See [Cloudflare's static asset binding documentation](https://developers.cloudflare.com/workers/static-assets/binding/) for the asset configuration.
 
 When merging upstream changes, compare `cloudflare/wrangler.example.jsonc` with your ignored local `cloudflare/wrangler.jsonc` and apply any new settings while preserving your account and resource IDs. Do not force-add the local config to Git. Never commit pairing codes, encryption keys, access tokens, local catalogs, or Apple signing files. For TestFlight distribution, configure your own Apple signing credentials; if you change the iPhone application identifier, update the project and the workflow launch/validation settings together. See the [native iPhone guide](docs/NATIVE-IOS.md).
 

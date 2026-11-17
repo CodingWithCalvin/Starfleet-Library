@@ -1,4 +1,5 @@
-import {parseConnection, vaultCrypto, sealConnection, openConnection} from './crypto.js';
+import {parseConnection, vaultCrypto, openConnection} from './crypto.js';
+import {deriveLogin, preparePasswordLogin, unlockPasswordKey} from './password.js';
 import {seriesNames, formats, readingStates, catalogLabel, filterBooks} from './catalog.js';
 
 const $ = id => document.getElementById(id);
@@ -10,6 +11,8 @@ let layout = 'covers';
 let refreshing = false;
 let lastUpdated = 0;
 let saved = null;
+let login = null;
+let gateVersion = 0;
 try { saved = localStorage.getItem(storageKey); } catch { /* Session-only access still works. */ }
 const coverUrls = new Map();
 const coverRequests = new Map();
@@ -30,27 +33,48 @@ function element(tag, className, text) {
   if (text != null) node.textContent = text;
   return node;
 }
-function showGate(message = '') {
+async function showGate(message = '') {
+  const version = ++gateVersion;
   $('gate').hidden = false;
   $('library').hidden = true;
-  $('pair-form').hidden = !!saved;
-  $('unlock-form').hidden = !saved;
-  $('gate-title').textContent = saved ? 'Welcome back, explorer.' : 'Bring your library along.';
-  $('gate-status').textContent = message;
+  for (const id of ['pair-form', 'unlock-form', 'login-form', 'legacy-unlock', 'retry-login']) $(id).hidden = true;
+  $('gate-title').textContent = 'Sign in to your library.';
+  $('gate-status').textContent = message || 'Connecting to your library…';
+  try {
+    const response = await request('/reader/login-info', null);
+    const info = await response.json();
+    if (version !== gateVersion || active) return;
+    login = info;
+    $('login-form').hidden = !login.enabled;
+    $('pair-form').hidden = !!login.enabled;
+    $('legacy-unlock').hidden = !saved;
+    $('cancel-setup').hidden = !login.enabled;
+    $('gate-title').textContent = login.enabled ? 'Sign in to your library.' : 'Set up your library password.';
+    $('gate-status').textContent = message;
+  } catch (error) {
+    if (version !== gateVersion || active) return;
+    $('gate-status').textContent = error.message;
+    $('retry-login').hidden = false;
+  }
 }
 function authHeaders(context) {
-  return {Authorization: 'Bearer ' + context.token, 'X-Starfleet-Vault': context.vaultId};
+  return context ? {Authorization: 'Bearer ' + context.token, 'X-Starfleet-Vault': context.vaultId} : {};
 }
 async function request(path, context, options = {}) {
   let response;
   try {
-    response = await fetch(path, {cache: 'no-store', credentials: 'omit', redirect: 'error', signal: context.controller?.signal,
-      ...options, headers: authHeaders(context)});
+    response = await fetch(path, {cache: 'no-store', credentials: 'omit', redirect: 'error', signal: context?.controller?.signal,
+      ...options, headers: {...options.headers, ...authHeaders(context)}});
   } catch (error) {
     if (error.name === 'AbortError') throw error;
     throw new Error('Could not reach your library. Check your connection and try again.');
   }
-  if (response.status === 401) throw new Error('This connection has expired or been revoked. Forget this browser and pair again.');
+  if (response.status === 401) {
+    if (context && context === active) lock('Your sign-in has expired or been revoked. Sign in again.');
+    throw new Error(path === '/reader/login' ? 'Incorrect library password. Try again.' : 'This connection has expired or been revoked. Sign in again or check your recovery connection code.');
+  }
+  if (response.status === 429) throw new Error('Too many sign-in attempts. Wait a minute and try again.');
+  if (response.status === 409) throw new Error('Password setup changed in another browser. Reload and try again.');
   if (!response.ok) throw new Error('Your library is temporarily unavailable. Please try again.');
   return response;
 }
@@ -82,42 +106,79 @@ async function connect(settings) {
 function busy(form, value) {
   for (const field of form.elements) field.disabled = value;
 }
-$('remember').addEventListener('change', () => {
-  const remember = $('remember').checked;
-  $('password-fields').hidden = !remember;
-  $('new-password').required = $('confirm-password').required = remember;
+$('retry-login').addEventListener('click', () => showGate());
+$('show-setup').addEventListener('click', () => {
+  $('login-form').hidden = $('unlock-form').hidden = true;
+  $('pair-form').hidden = false;
+  $('gate-title').textContent = 'Set up or reset your password.';
+  $('gate-status').textContent = '';
+});
+$('cancel-setup').addEventListener('click', () => showGate());
+$('legacy-unlock').addEventListener('click', () => {
+  $('login-form').hidden = $('pair-form').hidden = true;
+  $('unlock-form').hidden = false;
+  $('gate-title').textContent = 'Unlock saved browser access.';
+  $('gate-status').textContent = '';
+});
+async function signIn(info, keys) {
+  const response = await request('/reader/login', null, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: info.id, auth: keys.auth})});
+  const session = await response.json();
+  const credential = {token: session.token, vaultId: info.vaultId};
+  try {
+    const settings = await unlockPasswordKey(session.wrappedKey, keys, info, location.origin);
+    await connect({...settings, ...credential});
+  } catch (error) {
+    await request('/reader/session/revoke', credential, {method: 'POST'}).catch(() => {});
+    throw error;
+  }
+}
+$('login-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  busy(form, true);
+  $('gate-status').textContent = 'Unlocking your private library…';
+  try {
+    // Refresh metadata so a password reset in another browser cannot leave stale derivation parameters.
+    login = await (await request('/reader/login-info', null)).json();
+    if (!login.enabled) throw new Error('Password sign-in needs to be set up again with your recovery connection code.');
+    const keys = await deriveLogin($('library-password').value, login, location.origin);
+    await signIn(login, keys);
+  } catch (error) { $('gate-status').textContent = error.message; }
+  finally { $('library-password').value = ''; busy(form, false); }
 });
 $('pair-form').addEventListener('submit', async event => {
   event.preventDefault();
   const form = event.currentTarget;
-  let settings;
+  let temporary;
+  let configured = false;
   try {
     const native = parseConnection($('connection').value, location.origin);
-    const remember = $('remember').checked;
     const password = $('new-password').value;
-    if (remember && (password.length < 10 || password !== $('confirm-password').value)) throw new Error('Use at least 10 characters and enter the same password twice.');
+    if (password.length < 14 || password !== $('confirm-password').value) throw new Error('Use at least 14 characters and enter the same password twice.');
     busy(form, true);
     $('gate-status').textContent = 'Connecting to your private library…';
     const response = await request('/reader/session', {token: native.deviceToken, vaultId: native.vaultId}, {method: 'POST'});
     const session = await response.json();
-    settings = {token: session.token, expiresAt: session.expiresAt, vaultId: native.vaultId, encryptionKey: native.encryptionKey};
+    temporary = {token: session.token, vaultId: native.vaultId, crypto: await vaultCrypto(native)};
+    // Verify the recovery key against the catalog before changing password access.
+    await readEntries(temporary);
+    const prepared = await preparePasswordLogin(native, password, location.origin, login?.id ?? null);
+    await request('/reader/password', {token: native.deviceToken, vaultId: native.vaultId}, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(prepared.setup),
+    });
+    configured = true;
     native.deviceToken = native.encryptionKey = '';
     $('connection').value = '';
-    const encrypted = remember ? await sealConnection(settings, password, location.origin) : null;
-    await connect(settings);
-    if (encrypted) {
-      try { localStorage.setItem(storageKey, encrypted); saved = encrypted; }
-      catch { $('library-status').textContent = 'Connected for this session. Browser storage is unavailable, so your connection could not be remembered.'; }
-    }
+    login = {...prepared.info, enabled: true};
+    await signIn(login, prepared.keys);
     form.reset();
-    $('password-fields').hidden = true;
-    $('new-password').required = $('confirm-password').required = false;
   } catch (error) {
-    $('gate-status').textContent = error.message;
-    if (settings && !active) await request('/reader/session/revoke', settings, {method: 'POST'}).catch(() => {});
+    if (configured) await showGate('Your password was saved. ' + error.message);
+    else $('gate-status').textContent = error.message;
   } finally {
     $('new-password').value = $('confirm-password').value = '';
     busy(form, false);
+    if (temporary) await request('/reader/session/revoke', temporary, {method: 'POST'}).catch(() => {});
   }
 });
 $('unlock-form').addEventListener('submit', async event => {
@@ -144,13 +205,17 @@ function lock(message = '') {
   $('results').replaceChildren();
   $('detail-content').replaceChildren();
   $('details').close();
+  $('library-password').value = $('password').value = $('new-password').value = $('confirm-password').value = $('connection').value = '';
   $('search').value = '';
   for (const id of ['series', 'format', 'kind', 'reading']) $(id).value = '';
   history.replaceState(null, '', location.pathname);
   showGate(message);
-  (saved ? $('password') : $('connection')).focus();
 }
-$('lock').addEventListener('click', () => lock());
+$('lock').addEventListener('click', async () => {
+  const context = active;
+  lock();
+  if (context) await request('/reader/session/revoke', {token: context.token, vaultId: context.vaultId}, {method: 'POST'}).catch(() => {});
+});
 async function forget() {
   let message = 'This browser has been disconnected. Paste your connection code to pair again.';
   if (active) {

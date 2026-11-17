@@ -31,22 +31,23 @@ export async function readerSession(request, env) {
   const token = bearer(request);
   if (!token || !configuredVault(env) || request.headers.get('X-Starfleet-Vault') !== env.VAULT_ID) return null;
   const tokenHash = await digest(token);
-  const session = await env.DB.prepare('SELECT device_hash, vault_id, expires_at FROM reader_sessions WHERE token_hash=?').bind(tokenHash).first();
+  const session = await env.DB.prepare('SELECT device_hash, vault_id, expires_at, login_id FROM reader_sessions WHERE token_hash=?').bind(tokenHash).first();
   if (!session || session.expires_at <= Math.floor(Date.now() / 1000) || session.vault_id !== env.VAULT_ID || !tokenHashes(env).includes(session.device_hash)) return null;
+  if (session.login_id && !await env.DB.prepare('SELECT id FROM reader_login WHERE singleton=1 AND id=? AND vault_id=? AND device_hash=?').bind(session.login_id, env.VAULT_ID, session.device_hash).first()) return null;
   return tokenHash;
 }
 
-export async function createSession(env, deviceHash) {
+export async function createSession(env, deviceHash, loginId = null) {
   const token = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
   const now = Math.floor(Date.now() / 1000);
   const expiresAt = now + 30 * 24 * 60 * 60;
   await env.DB.prepare('DELETE FROM reader_sessions WHERE expires_at<=?').bind(now).run();
-  await env.DB.prepare('INSERT INTO reader_sessions(token_hash,device_hash,vault_id,expires_at) VALUES(?,?,?,?)')
-    .bind(await digest(token), deviceHash, env.VAULT_ID, expiresAt).run();
+  await env.DB.prepare('INSERT INTO reader_sessions(token_hash,device_hash,vault_id,expires_at,login_id) VALUES(?,?,?,?,?)')
+    .bind(await digest(token), deviceHash, env.VAULT_ID, expiresAt, loginId).run();
   return json({token, expiresAt});
 }
 
-const publicPaths = new Set(['/', '/index.html', '/app.js', '/crypto.js', '/catalog.js', '/styles.css', '/logo.svg']);
+const publicPaths = new Set(['/', '/index.html', '/app.js', '/crypto.js', '/password.js', '/catalog.js', '/styles.css', '/logo.svg']);
 export async function publicAsset(request, env) {
   if (!publicPaths.has(new URL(request.url).pathname)) return null;
   if (request.method !== 'GET' && request.method !== 'HEAD') return json({error: 'Method not allowed'}, 405);
