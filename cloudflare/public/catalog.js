@@ -5,6 +5,19 @@ export const readingStates = ['Unread', 'Reading', 'Finished'];
 export const catalogLabel = book => [book.kind === 1 ? 'COMIC' : '', seriesCodes[book.series] ?? 'OTHER'].filter(Boolean).join(' · ');
 const collator = new Intl.Collator(undefined, {numeric: true, sensitivity: 'base'});
 const normalize = value => String(value ?? '').normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase();
+const titleKey = title => title.normalize('NFC').trim().replace(/\s+/gu, ' ').toUpperCase();
+export const sameCoverTitle = (first, second) => titleKey(first.title) === titleKey(second.title);
+export const sameCoverGroup = (first, second) => first.format === second.format && first.ownership === second.ownership && sameCoverTitle(first, second);
+// Group the filtered, sorted view without modifying individual edition records.
+export function groupCovers(entries) {
+  const groups = new Map();
+  for (const entry of entries) {
+    const key = JSON.stringify([titleKey(entry.book.title), entry.book.format, entry.book.ownership]);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(entry);
+  }
+  return [...groups.values()];
+}
 export function filterBooks(entries, filters) {
   const query = normalize(filters.search).trim();
   const isbn = query.replace(/[^0-9x]/g, '');

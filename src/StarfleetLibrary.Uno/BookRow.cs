@@ -8,6 +8,17 @@ namespace StarfleetLibrary.Uno;
 public sealed class BookRow(Book book, CoverImageCache cache) : INotifyPropertyChanged
 {
     public Book Book { get; } = book;
+    private Book[] copies = [book];
+    public string CopyCountLabel => $"{copies.Length} copies";
+    public Visibility CopyCountVisibility => copies.Length > 1 ? Visibility.Visible : Visibility.Collapsed;
+    public void SetCopies(Book[] value)
+    {
+        if (copies.SequenceEqual(value)) return;
+        copies = value;
+        retryAfter = default;
+        foreach (var property in new[] { nameof(CopyCountLabel), nameof(CopyCountVisibility), nameof(AccessibleName) })
+            PropertyChanged?.Invoke(this, new(property));
+    }
     public string Title => Book.Title;
     public string Authors => string.IsNullOrWhiteSpace(Book.Authors) ? "Unknown author" : Book.Authors;
     public string Label => Book.CatalogLabel();
@@ -27,7 +38,7 @@ public sealed class BookRow(Book book, CoverImageCache cache) : INotifyPropertyC
     public string Status => Book.ReadingStatus.DisplayName();
     public double Progress => Book.Progress * 100;
     public string EditionLine => string.Join("  ·  ", new[] { Format, Year, Book.Edition }.Where(s => !string.IsNullOrWhiteSpace(s)));
-    public string AccessibleName => $"Open {Title}, {Authors}, {Label}, {Format}, {Status}";
+    public string AccessibleName => $"Open {Title}, {Authors}, {Label}, {Format}, {Status}" + (copies.Length > 1 ? $", {CopyCountLabel}" : "");
     public ImageSource? Cover { get; private set; }
     public event PropertyChangedEventHandler? PropertyChanged;
     private bool loading;
@@ -38,7 +49,12 @@ public sealed class BookRow(Book book, CoverImageCache cache) : INotifyPropertyC
         loading = true;
         try
         {
-            var path = await cache.GetAsync(Book);
+            string? path = null;
+            foreach (var copy in copies)
+            {
+                path = await cache.GetAsync(copy);
+                if (path is not null) break;
+            }
             if (path is not null)
             {
                 Cover = new BitmapImage(new Uri(path));

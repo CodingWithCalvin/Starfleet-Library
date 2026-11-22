@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {parseConnection, vaultCrypto, fromBase64, toBase64, sealConnection, openConnection} from '../cloudflare/public/crypto.js';
-import {filterBooks, catalogLabel} from '../cloudflare/public/catalog.js';
+import {filterBooks, catalogLabel, groupCovers, sameCoverGroup} from '../cloudflare/public/catalog.js';
 import {preparePasswordLogin, deriveLogin, unlockPasswordKey} from '../cloudflare/public/password.js';
 const fixture=JSON.parse(readFileSync(new URL('./fixtures/browser-vault.json',import.meta.url),'utf8'));
 const code='starfleet-v1:'+Buffer.from(JSON.stringify(fixture.settings)).toString('base64');
@@ -68,6 +68,28 @@ test('catalog search and filters distinguish comics, SNW, ownership and duplicat
  assert.deepEqual(filterBooks(entries,{...filters,ownership:1}).map(x=>x.id),['d']);
  assert.equal(catalogLabel(entries[2].book),'COMIC · SNW');
  assert.equal(filterBooks(entries,{...filters,search:'missing'}).length,0);
+});
+
+test('cover groups retain copies, separate formats and ownership, and count only filtered matches',()=>{
+ const first={id:'a',cover:null,book:{...fixture.book,title:'Q Squared',ownership:0,format:0,isbn:'9780306406157'}};
+ const second={id:'b',cover:'test-cover',book:{...first.book,title:'  q   SQUARED\t',isbn:'9780804429573'}};
+ const ebook={id:'c',book:{...first.book,format:2}};
+ const wish={id:'d',book:{...first.book,ownership:1}};
+ const sequel={id:'e',book:{...first.book,title:'Q Squared: Part Two'}};
+ const entries=[first,ebook,second,wish,sequel];
+ const before=JSON.stringify(entries);
+ const groups=groupCovers(entries);
+ assert.deepEqual(groups.map(group=>group.map(row=>row.id)),[['a','b'],['c'],['d'],['e']]);
+ assert.equal(groups.flat().length,entries.length);
+ assert.equal(JSON.stringify(entries),before);
+ assert.equal(sameCoverGroup(first.book,ebook.book),false);
+ assert.equal(sameCoverGroup(first.book,wish.book),false);
+ assert.equal(sameCoverGroup({...first.book,title:'Café'},{...first.book,title:'CAFE\u0301'}),true);
+ assert.equal(sameCoverGroup(first.book,{...first.book,title:'Q-Squared'}),false);
+ const filters={search:second.book.isbn,series:'',format:'',kind:'',reading:'',sort:'title',ownership:0};
+ assert.deepEqual(groupCovers(filterBooks(entries,filters)).map(group=>group.map(row=>row.id)),[['b']]);
+ assert.equal(groupCovers([first])[0].length,1);
+ assert.deepEqual(groupCovers([]),[]);
 });
 
 test('password login separates authentication from key wrapping and binds ciphertext to origin and login',async()=>{

@@ -1,6 +1,6 @@
 import {parseConnection, vaultCrypto, openConnection} from './crypto.js';
 import {deriveLogin, preparePasswordLogin, unlockPasswordKey} from './password.js';
-import {seriesNames, formats, readingStates, catalogLabel, filterBooks} from './catalog.js';
+import {seriesNames, formats, readingStates, catalogLabel, filterBooks, groupCovers, sameCoverGroup, sameCoverTitle} from './catalog.js';
 
 const $ = id => document.getElementById(id);
 const storageKey = 'starfleet-reader-connection-v1';
@@ -304,10 +304,10 @@ function drainCovers() {
       .finally(() => { coverJobs--; drainCovers(); });
   }
 }
-function bookButton(entry, className = '') {
+function bookButton(entry, className = '', copyCount = 1) {
   const button = element('button', 'book-button ' + className);
-  button.setAttribute('aria-label', `${entry.book.title}, ${formats[entry.book.format]}, ${catalogLabel(entry.book)}`);
-  button.title = `${entry.book.title} · ${formats[entry.book.format]}`;
+  button.setAttribute('aria-label', `${entry.book.title}, ${formats[entry.book.format]}, ${catalogLabel(entry.book)}` + (copyCount > 1 ? `, ${copyCount} copies` : ''));
+  button.title = `${entry.book.title} · ${formats[entry.book.format]}` + (copyCount > 1 ? ` · ${copyCount} copies` : '');
   button.addEventListener('click', () => openDetails(entry));
   return button;
 }
@@ -319,6 +319,7 @@ function render() {
   const filterCount = ['series', 'format', 'kind', 'reading'].filter(id => currentFilters[id] !== '').length;
   $('filter-toggle').textContent = filterCount ? `Filters (${filterCount})` : 'Filters';
   const visible = filterBooks(entries, currentFilters);
+  const groups = layout === 'covers' ? groupCovers(visible) : visible.map(entry => [entry]);
   const count = entries.filter(row => row.book.ownership === ownership).length;
   const name = ownership === 0 ? 'Collection' : 'Wishlist';
   $('collection-count').textContent = entries.filter(row => row.book.ownership === 0).length;
@@ -329,7 +330,7 @@ function render() {
     $(id).classList.toggle('active', selected);
     if (selected) $(id).setAttribute('aria-current', 'page'); else $(id).removeAttribute('aria-current');
   }
-  $('result-count').textContent = `${visible.length} of ${count} editions`;
+  $('result-count').textContent = layout === 'covers' ? `${groups.length} ${groups.length === 1 ? 'cover' : 'covers'} · ${visible.length} of ${count} ${count === 1 ? 'copy' : 'copies'}` : `${visible.length} of ${count} editions`;
   $('updated').textContent = 'Updated ' + new Date(lastUpdated).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
   const target = $('results');
   target.className = layout;
@@ -355,9 +356,12 @@ function render() {
     }
     table.append(body); fragment.append(table);
   } else {
-    for (const entry of visible) {
-      const button = bookButton(entry, layout === 'cards' ? 'card' : '');
-      button.append(cover(entry));
+    for (const group of groups) {
+      const entry = group[0];
+      const button = bookButton(entry, layout === 'cards' ? 'card' : '', group.length);
+      const artwork = cover(group.find(copy => copy.cover) ?? entry);
+      if (group.length > 1) artwork.append(element('span', 'copy-count', `${group.length} copies`));
+      button.append(artwork);
       if (layout === 'cards') {
         const info = element('span');
         info.append(element('span', 'book-label', catalogLabel(entry.book)), element('h3', '', entry.book.title), element('p', '', entry.book.authors),
@@ -415,13 +419,31 @@ function openDetails(entry, push = true) {
   const title = element('h2', '', book.title); title.id = 'detail-title';
   heading.append(element('span', 'book-label', catalogLabel(book)), title, element('p', 'detail-authors', book.authors), element('span', 'pill', book.ownership === 0 ? 'IN YOUR COLLECTION' : 'ON YOUR WISHLIST'));
   info.append(heading);
+  const copies = entries.filter(row => sameCoverGroup(book, row.book)).sort((a,b) => a.id.localeCompare(b.id));
+  if (copies.length > 1) {
+    const label = element('label', 'copy-picker', `${copies.length} copies · View a copy`);
+    const picker = element('select');
+    picker.setAttribute('aria-label', 'View a copy');
+    copies.forEach((copy, index) => {
+      const option = element('option', '', [`Copy ${index + 1}`, copy.book.edition, copy.book.isbn].filter(Boolean).join(' · '));
+      option.value = copy.id; picker.append(option);
+    });
+    picker.value = entry.id;
+    picker.addEventListener('change', () => {
+      const selected = copies.find(copy => copy.id === picker.value);
+      history.replaceState({bookId: selected.id}, '', '#book-' + selected.id);
+      openDetails(selected, false);
+      $('detail-content').querySelector('.copy-picker select').focus();
+    });
+    label.append(picker); info.append(label);
+  }
   const facts = element('dl', 'detail-facts');
   for (const [label, value] of [['Format', formats[book.format]], ['Series', seriesNames[book.series]], ['ISBN', book.isbn], ['Book number', book.bookNumber], ['Publisher', book.publisher], ['Published', book.publicationYear], ['Edition', book.edition], ['Reading', readingStates[book.readingStatus]], ['Pages', book.pageCount ? `${book.currentPage} / ${book.pageCount}` : ''], ['Rating', book.rating ? `${book.rating} / 5` : '']]) {
     if (!value || (active.public && ['Reading','Rating'].includes(label))) continue;
     const group = element('div'); group.append(element('dt', '', label), element('dd', '', active.public && label === 'Pages' ? String(book.pageCount) : value)); facts.append(group);
   }
   info.append(facts); content.append(info);
-  const others = entries.filter(row => row.id !== entry.id && row.book.title.trim().toLowerCase() === book.title.trim().toLowerCase());
+  const others = entries.filter(row => !sameCoverGroup(book, row.book) && sameCoverTitle(book, row.book));
   if (others.length) content.append(element('p', 'detail-other', 'Other editions: ' + others.map(row => `${formats[row.book.format]} (${row.book.ownership === 0 ? 'owned' : 'wishlist'})`).join(' · ')));
   if (book.notes) { const notes = element('div', 'detail-notes'); notes.append(element('h3', '', 'YOUR NOTES'), element('p', '', book.notes)); content.append(notes); }
   $('back').textContent = '← Back to ' + (ownership === 0 ? 'collection' : 'wishlist');

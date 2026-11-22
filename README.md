@@ -7,6 +7,7 @@ The repository includes the desktop app, mobile app, shared library code, sync s
 ## Features
 
 - Responsive cover gallery with corner ribbons identifying each edition’s format, wide cards and a scrollable table.
+- Cover tiles combine copies with the same title and format, ignoring capitalization and extra spaces, and show a copy count. Details let you choose each copy; card, table and list layouts retain separate records. Counts follow the current filters and keep Collection and Wishlist separate.
 - Search and filters for series, reading status, format and books/comics, including COMIC and SNW labels.
 - Owned books, wishlist, ISBN lookup and duplicate checks.
 - Edition metadata, reading progress, ratings, finish dates, notes and insights.

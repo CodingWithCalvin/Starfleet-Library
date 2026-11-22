@@ -26,6 +26,20 @@ public sealed partial class MainPage
         title.Children.Add(Text(book.Authors, 16));
         title.Children.Add(Text(Row(book).EditionLine, 13));
         title.Children.Add(Text($"{book.Ownership.DisplayName()}  ·  {book.ReadingStatus.DisplayName()}", 13, "#147D83"));
+        var copies = store.Books.Where(copy => CoverGroups.SameGroup(book, copy)).OrderBy(copy => copy.AddedAt).ThenBy(copy => copy.Id).ToArray();
+        if (copies.Length > 1)
+        {
+            var copyPicker = new ComboBox
+            {
+                Header = $"{copies.Length} copies · View a copy",
+                ItemsSource = copies.Select(CoverGroups.CopyLabel).ToArray(),
+                SelectedIndex = Array.FindIndex(copies, copy => copy.Id == book.Id),
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            AutomationProperties.SetName(copyPicker, "View a copy");
+            copyPicker.SelectionChanged += (_, _) => { if (copyPicker.SelectedIndex >= 0) ShowDetail(copies[copyPicker.SelectedIndex]); };
+            title.Children.Add(copyPicker);
+        }
         var edit = ActionButton("Edit details", async (_, _) => await EditBookAsync(book, false), true);
         edit.IsEnabled = !store.IsReadOnly;
         title.Children.Add(edit);

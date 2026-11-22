@@ -16,6 +16,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Invalid and unsupported backups are rejected", () => Run(InvalidBackups)),
     ("Exact matches include owned and wished equivalent ISBNs", () => Run(ExactMatching)),
     ("Other-edition hints are conservative", () => Run(OtherEditionHints)),
+    ("Cover groups count matching title and format copies without merging records", () => Run(CoverGrouping)),
     ("Missing repository starts empty", MissingRepository),
     ("Atomic persistence round-trips full catalog", PersistenceRoundTrip),
     ("Rejected writes preserve the active catalog", RejectedSavePreservesCatalog),
@@ -221,6 +222,32 @@ static void OtherEditionHints()
     Check.Equal(new[] { ebook.Id, noIsbn.Id }, matches.Select(b => b.Id).ToArray(), sequence: true);
     Check.Equal(0, CatalogMatcher.PossibleOtherEditions(candidate with { Authors = "" }, new[] { ebook }).Count);
     Check.Equal(0, CatalogMatcher.PossibleOtherEditions(candidate with { Title = "" }, new[] { ebook }).Count);
+}
+
+static void CoverGrouping()
+{
+    var first = CompleteBook() with { Title = "Q Squared", Format = BookFormat.Paperback };
+    var second = first with { Id = Guid.NewGuid(), Title = "  q   SQUARED\t", Isbn = "9780804429573", Notes = "Another physical copy", ReadingStatus = ReadingStatus.Unread };
+    var ebook = first with { Id = Guid.NewGuid(), Format = BookFormat.Ebook };
+    var wished = first with { Id = Guid.NewGuid(), Ownership = OwnershipStatus.Wishlist };
+    var sequel = first with { Id = Guid.NewGuid(), Title = "Q Squared: Part Two" };
+    var books = new[] { first, ebook, second, wished, sequel };
+    var before = CatalogBackup.Encode(books);
+    var groups = CoverGroups.Group(books);
+    Check.Equal(4, groups.Length);
+    Check.Equal(new[] { first.Id, second.Id }, groups[0].Select(book => book.Id).ToArray(), sequence: true);
+    Check.Equal(ebook.Id, groups[1][0].Id);
+    Check.Equal(wished.Id, groups[2][0].Id);
+    Check.Equal(sequel.Id, groups[3][0].Id);
+    Check.Equal(5, groups.Sum(group => group.Length));
+    Check.Equal(before, CatalogBackup.Encode(books), sequence: true);
+    Check.Equal(1, CoverGroups.Group(books.Where(book => book.Isbn == second.Isbn))[0].Length);
+    Check.Equal(1, CoverGroups.Group(new[] { first })[0].Length);
+    Check.Equal(0, CoverGroups.Group([]).Length);
+    Check.False(CoverGroups.SameGroup(first, ebook));
+    Check.False(CoverGroups.SameGroup(first, wished));
+    Check.True(CoverGroups.SameGroup(first with { Title = "Café" }, second with { Title = "CAFE\u0301" }));
+    Check.False(CoverGroups.SameGroup(first, second with { Title = "Q-Squared" }));
 }
 
 static async Task MissingRepository()

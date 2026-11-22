@@ -29,6 +29,11 @@
         HorizontalAlignment="Center" VerticalAlignment="Center" />
      </Border>
     </Canvas>
+    <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="8" Padding="9,5"
+      Background="#F0101D32" BorderBrush="#E7EDF7" BorderThickness="1" CornerRadius="12"
+      Visibility="{Binding CopyCountVisibility}" IsHitTestVisible="False">
+     <TextBlock Text="{Binding CopyCountLabel}" Foreground="White" FontSize="12" FontWeight="SemiBold" />
+    </Border>
    </Grid>
   </DataTemplate>
   <DataTemplate x:Key="CardTemplate">

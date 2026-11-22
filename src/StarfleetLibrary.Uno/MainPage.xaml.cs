@@ -255,11 +255,20 @@ public sealed partial class MainPage : Page
         var terms = search.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (terms.Length > 0) selection = selection.Where(b => terms.All(term => $"{b.Title} {b.Authors} {b.Isbn} {b.Series.DisplayName()} {b.CatalogLabel()}".Contains(term, StringComparison.OrdinalIgnoreCase)));
         selection = sort switch { 1 => selection.OrderBy(b => b.Authors).ThenBy(b => b.Title), 2 => selection.OrderByDescending(b => b.AddedAt), 3 => selection.OrderByDescending(b => b.PublicationYear).ThenBy(b => b.Title), _ => selection.OrderBy(b => b.Title, StringComparer.CurrentCultureIgnoreCase) };
-        var visible = selection.Select(Row).ToArray();
+        var matching = selection.ToArray();
+        var groups = store.Preferences.Layout == 2 ? CoverGroups.Group(matching) : matching.Select(book => new[] { book }).ToArray();
+        var visible = groups.Select(group =>
+        {
+            var row = Row(group[0]);
+            row.SetCopies(group);
+            return row;
+        }).ToArray();
         // Keep existing containers when the result set has not changed.
         if (itemView.ItemsSource is not BookRow[] previous || !previous.SequenceEqual(visible))
             itemView.ItemsSource = visible;
-        resultCount!.Text = $"{visible.Length:N0} shown  /  {total:N0} titles";
+        resultCount!.Text = store.Preferences.Layout == 2
+            ? $"{visible.Length:N0} {(visible.Length == 1 ? "cover" : "covers")} · {matching.Length:N0} of {total:N0} {(total == 1 ? "copy" : "copies") }"
+            : $"{matching.Length:N0} of {total:N0} editions";
         var active = new[] { seriesFilter, formatFilter, statusFilter }.Count(i => i > 0);
         filterButton!.Content = active > 0 ? $"Filters · {active}" : "Filters";
         if (results!.Children.LastOrDefault() is StackPanel empty) results.Children.Remove(empty);

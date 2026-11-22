@@ -116,8 +116,9 @@ public sealed partial class MainPage : Page
             .Where(b=>format==0 || (int)b.Format==format-1)
             .Where(b=>query.Split(' ',StringSplitOptions.RemoveEmptyEntries).All(term=>$"{b.Title} {b.Authors} {b.Isbn} {b.Series.DisplayName()} {b.CatalogLabel()}".Contains(term,StringComparison.OrdinalIgnoreCase)))
             .OrderBy(b=>b.Title,StringComparer.OrdinalIgnoreCase).ThenBy(b=>b.Format).ToArray();
-        list.ItemsSource=books.Select(b=>new MobileRow(b,CoverUrl(b))).ToArray();
-        count!.Text=$"{books.Length} {(books.Length==1 ? "edition" : "editions")} · {(shelf==OwnershipStatus.Owned ? "on your shelves" : "to look out for")}";
+        var groups=covers ? CoverGroups.Group(books) : books.Select(book=>new[]{book}).ToArray();
+        list.ItemsSource=groups.Select(group=>new MobileRow(group[0],group.Select(CoverUrl).FirstOrDefault(url=>url is not null),group.Length)).ToArray();
+        count!.Text=(covers ? $"{groups.Length} {(groups.Length==1 ? "cover" : "covers")} · {books.Length} {(books.Length==1 ? "copy" : "copies")}" : $"{books.Length} {(books.Length==1 ? "edition" : "editions")}") + $" · {(shelf==OwnershipStatus.Owned ? "on your shelves" : "to look out for")}";
         empty!.Text=books.Length==0 ? query.Length>0 || format>0 ? "No matching editions.\nTry another search or filter." : shelf==OwnershipStatus.Wishlist ? "Your next adventure starts here.\nTap + Add to save a book for later." : store.LastSync is null ? "Your library will appear after the first sync." : "No editions in this view.\nTap + Add or change the filters." : "";
     }
     private string? CoverUrl(Book book) => store.CoverFile(book.Id);
@@ -131,6 +132,14 @@ public sealed partial class MainPage : Page
         if (CoverUrl(book) is { } cover) image.Source=new BitmapImage(new Uri(cover));panel.Children.Add(image);
         panel.Children.Add(Txt(book.CatalogLabel(),12,"#147077",true));panel.Children.Add(Txt(book.Title,26,"#17243B",true));panel.Children.Add(Txt(book.Authors,16));
         panel.Children.Add(Txt($"{book.Format.DisplayName()} · {book.Ownership.DisplayName()}",16,"#147077",true));
+        var copies=store.Books.Where(copy=>CoverGroups.SameGroup(book,copy)).OrderBy(copy=>copy.AddedAt).ThenBy(copy=>copy.Id).ToArray();
+        if(copies.Length>1)
+        {
+            var picker=Pick(copies.Select(CoverGroups.CopyLabel).ToArray(),Array.FindIndex(copies,copy=>copy.Id==book.Id));
+            AutomationProperties.SetName(picker,"View a copy");
+            picker.SelectionChanged+=(_,_)=>{if(picker.SelectedIndex>=0)ShowDetail(copies[picker.SelectedIndex]);};
+            Label(panel,$"{copies.Length} copies · View a copy",picker);
+        }
         if (book.Ownership==OwnershipStatus.Wishlist) panel.Children.Add(Btn("I bought this · Move to Collection",async (_,_)=>{if(await Save(book with { Ownership=OwnershipStatus.Owned },book)){shelf=OwnershipStatus.Owned;ShowDetail(book with { Ownership=OwnershipStatus.Owned });}},true));
         panel.Children.Add(Btn("Edit edition",(_,_)=>ShowEditor(book,false)));
         panel.Children.Add(Txt(string.Join("\n",new[]{book.Isbn.Length>0 ? "ISBN "+book.Isbn : "",book.Publisher,book.PublicationYear,book.Edition}.Where(x=>x.Length>0))));
@@ -186,7 +195,7 @@ public sealed partial class MainPage : Page
     internal static SolidColorBrush Brush(string color)=>new(Windows.UI.Color.FromArgb(255,Convert.ToByte(color.Substring(1,2),16),Convert.ToByte(color.Substring(3,2),16),Convert.ToByte(color.Substring(5,2),16)));
 }
 
-public sealed class MobileRow(Book book,string? cover)
+public sealed class MobileRow(Book book,string? cover,int copyCount=1)
 {
     public Book Book=>book;
     public string Title=>book.Title;
@@ -194,7 +203,9 @@ public sealed class MobileRow(Book book,string? cover)
     public string Label=>book.CatalogLabel();
     public string Format=>book.Format.DisplayName();
     public string FormatCaps=>Format.ToUpperInvariant();
-    public string AccessibleName=>$"{Title}, {Format}, {Label}";
+    public string CopyCountLabel=>$"{copyCount} copies";
+    public Visibility CopyCountVisibility=>copyCount>1 ? Visibility.Visible : Visibility.Collapsed;
+    public string AccessibleName=>$"{Title}, {Format}, {Label}"+(copyCount>1 ? $", {CopyCountLabel}" : "");
     public ImageSource? Cover {get;}=cover is null ? null : new BitmapImage(new Uri(cover));
     public SolidColorBrush Ribbon=>MainPage.Brush(book.Format switch {BookFormat.Paperback=>"#8C4E22",BookFormat.Hardcover=>"#344B76",BookFormat.Audiobook=>"#6D488F",_=>"#147077"});
 }
