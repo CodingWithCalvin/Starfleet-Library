@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml.Input;
+using Windows.ApplicationModel.DataTransfer;
 using StarfleetLibrary.Core;
 
 namespace StarfleetLibrary.Mobile;
@@ -6,6 +7,7 @@ namespace StarfleetLibrary.Mobile;
 public sealed partial class MainPage
 {
     private bool numbering, onlyMissingNumbers = true, storyArcView, startedArcsOnly = true;
+    private bool buyingGuideView = true;
     private int numberedSeries = 1, numberedFormat;
     private string firstNumber = "1", lastNumber = "63";
     private StackPanel? numberedResults;
@@ -17,13 +19,16 @@ public sealed partial class MainPage
         numbering = true; editing = detail = false; list = null;
         Heading.Text = "Missing books";
         var panel = PagePanel("Back to " + (shelf == OwnershipStatus.Owned ? "collection" : "wishlist"), (_, _) => ShowShelf());
-        var view = Pick(["Numbered series", "Story arcs"], storyArcView ? 1 : 0);
+        var view = Pick(["Buying guide", "Numbered series", "Story arcs"], buyingGuideView ? 0 : storyArcView ? 2 : 1);
         Label(panel, "View", view);
-        view.SelectionChanged += (_, _) => { storyArcView = view.SelectedIndex == 1; ShowNumbering(); };
+        view.SelectionChanged += (_, _) => { buyingGuideView = view.SelectedIndex == 0; storyArcView = view.SelectedIndex == 2; ShowNumbering(); };
         var series = Pick(Enum.GetValues<TrekSeries>().Select(value => value.DisplayName()).ToArray(), numberedSeries);
         Label(panel, "Series", series);
         var formatPicker = Pick(["Print books", "Any format", "Paperback", "Hardcover", "E-book", "Audiobook"], numberedFormat);
         Label(panel, "Format", formatPicker);
+        var options = new StackPanel { Spacing = 12 };
+        var optionParent = buyingGuideView ? options : panel;
+        if (buyingGuideView) panel.Children.Add(new Expander { Header = "Range & options", Content = options, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch });
         var range = new Grid { ColumnSpacing = 12 };
         range.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
         range.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
@@ -31,15 +36,22 @@ public sealed partial class MainPage
         var first = Field(startPanel, "First number", firstNumber); var last = Field(endPanel, "Last number", lastNumber);
         first.InputScope = new() { Names = { new InputScopeName { NameValue = InputScopeNameValue.Number } } };
         last.InputScope = new() { Names = { new InputScopeName { NameValue = InputScopeNameValue.Number } } };
-        range.Children.Add(startPanel); Grid.SetColumn(endPanel, 1); range.Children.Add(endPanel); if (!storyArcView) panel.Children.Add(range);
-        panel.Children.Add(Txt(storyArcView ? "Complete your multi-part stories. Print books counts paperbacks and hardcovers; an ebook omnibus won't fill a print gap." : "Print books counts paperbacks and hardcovers. Classic Pocket Books ranges are suggested; adjust for your numbering scheme. Only saved book numbers count; comics are excluded.", 12));
+        range.Children.Add(startPanel); Grid.SetColumn(endPanel, 1); range.Children.Add(endPanel); if (!storyArcView) optionParent.Children.Add(range);
+        optionParent.Children.Add(Txt(buyingGuideView ? "Wishlist + missing numbers + story-arc parts. ISBNs are edition references; reprints may differ." : storyArcView ? "Complete your multi-part stories. Print books counts paperbacks and hardcovers; an ebook omnibus won't fill a print gap." : "Print books counts paperbacks and hardcovers. Classic Pocket Books ranges are suggested; adjust for your numbering scheme. Only saved book numbers count; comics are excluded.", 12));
         var missing = new CheckBox { Content = storyArcView ? "Only missing parts" : "Only missing numbers", IsChecked = onlyMissingNumbers };
-        missing.Click += (_, _) => { onlyMissingNumbers = missing.IsChecked == true; RefreshNumbering(); }; panel.Children.Add(missing);
-        if (storyArcView)
+        missing.Click += (_, _) => { onlyMissingNumbers = missing.IsChecked == true; RefreshNumbering(); }; if (!buyingGuideView) panel.Children.Add(missing);
+        if (storyArcView || buyingGuideView)
         {
             var started = new CheckBox { Content = "Only sets I own in this format", IsChecked = startedArcsOnly };
-            started.Click += (_, _) => { startedArcsOnly = started.IsChecked == true; RefreshNumbering(); }; panel.Children.Add(started);
+            started.Click += (_, _) => { startedArcsOnly = started.IsChecked == true; RefreshNumbering(); }; optionParent.Children.Add(started);
         }
+        if (buyingGuideView) panel.Children.Add(Btn("Copy buying guide", (_, _) =>
+        {
+            var guide = BuildBuyingGuide(); var data = new DataPackage();
+            data.SetText($"{((TrekSeries)numberedSeries).DisplayName()}\n\n" + guide.ShoppingList + "\n\n" + string.Join("\n", guide.Warnings));
+            try { Clipboard.SetContent(data); SyncStatus.Content = "Buying guide copied."; }
+            catch { SyncStatus.Content = "Could not copy the buying guide."; }
+        }));
         numberedResults = new StackPanel { Spacing = 14 }; panel.Children.Add(numberedResults);
         series.SelectionChanged += (_, _) =>
         {
@@ -57,6 +69,7 @@ public sealed partial class MainPage
     {
         if (!numbering || editing || detail || numberedResults is null) return;
         numberedResults.Children.Clear();
+        if (buyingGuideView) { ShowBuyingGuide(); return; }
         if (storyArcView) { ShowStoryArcResults(); return; }
         if (NumberedBooks.ParseNumber(firstNumber) is not { } first || NumberedBooks.ParseNumber(lastNumber) is not { } last || last < first)
         { numberedResults.Children.Add(Txt("Choose a whole-number range between 1 and 1000. Some series have no standard numbered run.")); return; }
@@ -76,6 +89,26 @@ public sealed partial class MainPage
             numberedResults.Children.Add(Txt("Tap an edition to fill its number, or use ISBN lookup. Leave unnumbered releases blank.", 12));
             foreach (var book in report.NeedsNumber.OrderBy(book => book.Title))
                 numberedResults.Children.Add(Btn($"{book.Title}\n{book.Format.DisplayName()} · {book.Isbn}", (_, _) => ShowEditor(book, false)));
+        }
+    }
+
+    private BuyingGuideReport BuildBuyingGuide() => BuyingGuide.Build(store.Books, (TrekSeries)numberedSeries,
+        numberedFormat <= 1 ? null : (BookFormat)(numberedFormat - 2), NumberedBooks.ParseNumber(firstNumber) ?? 0,
+        NumberedBooks.ParseNumber(lastNumber) ?? 0, numberedFormat == 0, startedArcsOnly);
+
+    private void ShowBuyingGuide()
+    {
+        var report = BuildBuyingGuide();
+        numberedResults!.Children.Add(Txt($"{report.Items.Length} books to look for", 20, "#17243B", true));
+        if (report.Warnings.Length > 0) numberedResults.Children.Add(new Expander { Header = "Matching notes", Content = Txt(string.Join("\n", report.Warnings), 12, "#9B552B"), HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch });
+        if (report.Items.Length == 0) numberedResults.Children.Add(Txt("No books needed for these filters."));
+        foreach (var item in report.Items)
+        {
+            var row = new StackPanel { Spacing = 4 };
+            row.Children.Add(Txt(item.Title, 16, "#17243B", true));
+            row.Children.Add(Txt(item.Identification + " · " + item.FormatLabel, 12, "#147077"));
+            if (item.Isbn.Length > 0) { var isbn = Txt("ISBN " + item.Isbn, 12); isbn.IsTextSelectionEnabled = true; row.Children.Add(isbn); }
+            numberedResults.Children.Add(new Border { Child = row, Padding = new(0, 0, 0, 12), BorderThickness = new(0, 0, 0, 1), BorderBrush = Brush("#DCE3E8") });
         }
     }
 

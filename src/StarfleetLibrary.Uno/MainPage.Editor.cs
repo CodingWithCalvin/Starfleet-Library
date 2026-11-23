@@ -61,6 +61,7 @@ public sealed partial class MainPage
         var clearDate = ActionButton("Clear finished date", (_, _) => finished.Date = null); form.Children.Add(clearDate);
         form.Children.Add(Text("Artwork & notes", 20, "#17243B", true));
         form.Children.Add(cover);
+        form.Children.Add(Text("To replace an imported title page, paste a direct cover image URL from the publisher or Open Library, then preview it. A saved URL takes priority over imported artwork.", 12));
         var preview = new ContentControl { HorizontalContentAlignment = HorizontalAlignment.Left };
         preview.Content = CoverImage(original, 90, 134);
         form.Children.Add(ActionButton("Preview cover", (_, _) =>

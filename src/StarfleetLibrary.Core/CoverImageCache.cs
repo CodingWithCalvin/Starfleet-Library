@@ -13,9 +13,14 @@ public sealed class CoverImageCache(HttpClient client, string directory, string?
 
     public async Task<string?> GetAsync(Book book)
     {
+        if (BookCover.IsWebUrl(book.CoverUrl))
+        {
+            var custom = await GetSourceAsync(new Uri(book.CoverUrl!.Trim())).ConfigureAwait(false);
+            if (custom is not null) return custom;
+        }
         // Imported artwork belongs to the app, not to a cache or the source library.
         // An explicit URL chosen in the editor overrides the imported image.
-        if (!BookCover.IsWebUrl(book.CoverUrl) && importedCoverDirectory is not null)
+        if (importedCoverDirectory is not null)
         {
             foreach (var extension in new[] { ".jpg", ".png", ".gif" })
             {
@@ -23,8 +28,13 @@ public sealed class CoverImageCache(HttpClient client, string directory, string?
                 if (File.Exists(imported)) return imported;
             }
         }
-        var source = BookCover.Source(book);
+        var source = BookCover.Source(book with { CoverUrl = null });
         if (source is null) return null;
+        return await GetSourceAsync(source).ConfigureAwait(false);
+    }
+
+    private async Task<string?> GetSourceAsync(Uri source)
+    {
         var key = source.AbsoluteUri;
         var request = _pending.GetOrAdd(key, _ => new Lazy<Task<string?>>(() => DownloadAsync(source)));
         try { return await request.Value.ConfigureAwait(false); }

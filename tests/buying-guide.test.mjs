@@ -1,0 +1,43 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {buyingGuide, parseNumberedReference, shoppingList} from '../cloudflare/public/buying-guide.js';
+const arcs = JSON.parse(await readFile(new URL('../cloudflare/public/story-arcs.json', import.meta.url)));
+const novels = parseNumberedReference(await readFile(new URL('../cloudflare/public/numbered-novels.tsv', import.meta.url), 'utf8'));
+const entry = (title, extra = {}) => ({book:{title, series:1, kind:0, format:0, ownership:0, isbn:'', bookNumber:'', ...extra}});
+const guide = (entries, first, last, format = null, physical = true, series = 1) => buyingGuide(entries, novels, arcs, series, format, first, last, physical);
+test('buying guide merges wishes, numbered gaps and arcs; ISBNs fill blank numbers', () => {
+  assert.equal(novels.length,208);
+  const helix = arcs.find(a => a.id === 'double-helix');
+  const books = helix.parts.slice(0,5).map(p => entry(p.title, {isbn:p.isbns[0]}));
+  const wish = entry('The First Virtue', {isbn:helix.parts[5].isbns[0], ownership:1});
+  books.push(wish, structuredClone(wish));
+  const before = JSON.stringify(books), result = guide(books,51,56);
+  assert.equal(result.items.length,1); assert.equal(result.items[0].reasons.length,3);
+  assert.deepEqual(result.items[0].formats,['Paperback']);
+  assert.match(shoppingList(result),/TNG #56/); assert.match(shoppingList(result),/Double Helix 6\/6/);
+  assert.equal(JSON.stringify(books),before);
+  books.push(entry('The First Virtue'));
+  assert.equal(guide(books,51,56).items.length,0);
+});
+test('hardcover wishes survive paperback ownership; ebooks do not fill print gaps', () => {
+  const novel = novels.find(n => n.series === 1 && n.number === 1);
+  const paper = entry(novel.title,{isbn:novel.isbn}), wish = entry(novel.title,{isbn:novel.isbn,format:1,ownership:1});
+  assert.deepEqual(guide([paper,wish],1,1).items[0].formats,['Hardcover']);
+  assert.equal(guide([paper,wish],1,1,0).items.length,0);
+  assert.equal(guide([entry(novel.title,{isbn:novel.isbn,format:2})],1,1).items.length,1);
+  assert.equal(guide([entry(novel.title,{isbn:novel.isbn,format:2})],1,1,null,false).items.length,0);
+  const omnibus = entry('Double Helix Omnibus',{format:2});
+  assert.equal(guide([omnibus],51,56,null,false).items.length,0);
+  assert.equal(guide([omnibus],51,56).items.length,6);
+  assert.equal(guide([entry('Star Trek: The Next Generation: '+novel.title)],1,1).items.length,0);
+});
+test('invalid ranges preserve wishlist and arcs, comics do not fill novel gaps', () => {
+  const comic = entry('My comic',{series:8,kind:1,ownership:1,bookNumber:'1'});
+  const result = guide([comic],0,0,null,true,8);
+  assert.equal(result.items.length,1); assert.equal(result.items[0].reasons[0],'Wishlist · COMIC'); assert.ok(result.warnings.length);
+  assert.equal(guide([comic],0,0).items.length,0);
+  assert.equal(guide([],99,99,null,true,8).items[0].title,'SNW #99 (title unknown)');
+  assert.equal(guide([entry('My comic',{series:8,kind:1,bookNumber:'1'})],1,1,null,true,8).items.length,1);
+  assert.ok(!guide([entry('Unknown',{bookNumber:'56'}), entry('Infection')],56,56).items.some(i => i.key === 'number:1:56'));
+});

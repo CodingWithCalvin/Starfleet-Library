@@ -65,6 +65,15 @@ static class CoverChecks
             Check.Equal(localPath, await cache.GetAsync(book));
             Check.Equal<string?>(null, await cache.GetAsync(new Book()));
             Check.Equal(Png, await File.ReadAllBytesAsync(localPath), sequence: true);
+            using var unavailable = new HttpClient(new Handler(() => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound))));
+            var fallback = new CoverImageCache(unavailable, Path.Combine(directory, "offline"), importedDirectory);
+            Check.Equal(localPath, await fallback.GetAsync(book with { CoverUrl = "https://example.invalid/gone" }));
+            var webRequests = 0;
+            using var web = new HttpClient(new Handler(() => Task.FromResult(++webRequests == 1
+                ? new HttpResponseMessage(HttpStatusCode.NotFound)
+                : new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Png) })));
+            var isbnFallback = await new CoverImageCache(web, Path.Combine(directory, "isbn-fallback")).GetAsync(book with { CoverUrl = "https://example.invalid/gone" });
+            Check.NotNull(isbnFallback); Check.Equal(2, webRequests);
         });
     }
 

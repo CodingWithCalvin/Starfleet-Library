@@ -47,7 +47,7 @@ export async function createSession(env, deviceHash, loginId = null) {
   return json({token, expiresAt});
 }
 
-const publicPaths = new Set(['/', '/index.html', '/app.js', '/crypto.js', '/password.js', '/catalog.js', '/numbering.js', '/story-arcs.js', '/story-arcs.json', '/styles.css', '/logo.svg']);
+const publicPaths = new Set(['/', '/index.html', '/app.js', '/crypto.js', '/password.js', '/catalog.js', '/numbering.js', '/story-arcs.js', '/story-arcs.json', '/buying-guide.js', '/numbered-novels.tsv', '/styles.css', '/logo.svg']);
 export async function publicAsset(request, env) {
   if (!publicPaths.has(new URL(request.url).pathname)) return null;
   if (request.method !== 'GET' && request.method !== 'HEAD') return json({error: 'Method not allowed'}, 405);

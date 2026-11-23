@@ -1,5 +1,13 @@
 # Numbered books and missing volumes
 
+## Buying guide
+
+**Missing books → Buying guide** is a compact shopping list in Windows, iPhone and the browser. It combines wishlist entries, missing numbered volumes and missing parts of story arcs under the same Series and Format filters. Each row contains the title, number/arc part, desired format and an ISBN reference when available. **Copy buying guide** produces a plain checklist for notes. Wishlist entries come first; duplicate suggestions are combined. The guide does not add wishlist records or mark purchases as owned.
+
+Print books is the default. A specific hardcover wish remains even if you own a paperback. Story arcs default to sets already started in the chosen format. The first/last range applies only to numbered gaps; an empty or invalid range still allows wishlist and arc suggestions. Matching notes are collapsed to keep the list easy to scan.
+
+Unlike the saved-number report, the guide also recognizes verified reference ISBNs, exact reference titles and known arc title variants without changing saved numbers. Unrecognized or ambiguous editions remain flagged for review. Reference ISBNs identify one known edition; a different printing or desired format may have a different ISBN. Supported arcs and numbered ranges are limited to the references below.
+
 The **Series** and **Format** filters apply to both the gap report and the numbering review. The default format is **Print books (paperback + hardcover)**, so ebook and audiobook ownership does not fill a physical collection gap. You can also choose Paperback, Hardcover, E-book, Audiobook, or Any format separately.
 
 Open **Missing books** on Windows or in the browser, or **Missing books / story arcs** from an iPhone shelf. Choose **Numbered series**, a series, a format (or Any format), and an inclusive first/last number. The view counts saved, positive whole-number `BookNumber` values from owned books. Multiple copies of a number count once. Comics and other series do not count. Wishlist entries are labeled **On wishlist**, but remain missing until owned. When a particular format is selected, an owned copy in another format does not fill that gap.
@@ -16,7 +24,7 @@ Blank or invalid numbers are shown for review, not inferred from titles. They ma
 
 ## ISBN numbering sources
 
-The shared library embeds `NumberedNovels.tsv`, an ISBN-to-main-series-number reference containing 208 classic numbered novels. ISBN-10 and equivalent ISBN-13 values match the same record. It uses the numbered-novel tables from these bibliographies, checked November 23, 2026:
+The shared library embeds `cloudflare/public/numbered-novels.tsv`, an ISBN-to-main-series-number reference containing 208 classic numbered novels. ISBN-10 and equivalent ISBN-13 values match the same record. It uses the numbered-novel tables from these bibliographies, checked November 23, 2026:
 
 - [Star Trek novels — Original Series numbered novels](https://en.wikipedia.org/wiki/List_of_Star_Trek_novels)
 - [The Next Generation novels](https://en.wikipedia.org/wiki/List_of_Star_Trek:_The_Next_Generation_novels)

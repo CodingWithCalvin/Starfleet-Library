@@ -1,9 +1,12 @@
 import {seriesNames, formats, numberedReport, suggestedNumberEnd} from './catalog.js';
 import {storyArcReport} from './story-arcs.js';
+import {buyingGuide, parseNumberedReference, shoppingList} from './buying-guide.js';
 const $ = id => document.getElementById(id);
 function text(tag, content, className = '') { const node = document.createElement(tag); node.textContent = content; node.className = className; return node; }
 let entries = [], bookButton;
-let arcReference = null, arcError = '';
+let arcReference = null, arcError = '', novelReference = null, novelError = '';
+const isBuyingView = () => $('missing-view-mode').value === 'buying';
+const guide = () => buyingGuide(entries, novelReference, arcReference, ...selection(), $('arc-started').checked);
 const isArcView = () => $('missing-view-mode').value === 'arcs';
 function arcReports() {
   const [series, format, , , physicalOnly] = selection();
@@ -17,8 +20,11 @@ function selection() {
 export function initializeNumbering(makeBookButton) {
   bookButton = makeBookButton;
   fetch(new URL('./story-arcs.json', import.meta.url)).then(response => { if (!response.ok) throw new Error(); return response.json(); })
-    .then(reference => { if (!Array.isArray(reference)) throw new Error(); arcReference = reference; if (isArcView()) renderNumbering(entries); })
-    .catch(() => { arcError = 'Could not load the story-arc reference. Reload the page to retry.'; if (isArcView()) renderNumbering(entries); });
+    .then(reference => { if (!Array.isArray(reference)) throw new Error(); arcReference = reference; if (isArcView() || isBuyingView()) renderNumbering(entries); })
+    .catch(() => { arcError = 'Could not load the story-arc reference. Reload the page to retry.'; if (isArcView() || isBuyingView()) renderNumbering(entries); });
+  fetch(new URL('./numbered-novels.tsv', import.meta.url)).then(response => { if (!response.ok) throw new Error(); return response.text(); })
+    .then(tsv => { novelReference = parseNumberedReference(tsv); if (isBuyingView()) renderNumbering(entries); })
+    .catch(() => { novelError = 'Could not load the numbered reference. Reload to retry.'; if (isBuyingView()) renderNumbering(entries); });
   seriesNames.forEach((name, index) => $('numbered-series').add(new Option(name, index)));
   formats.forEach((name, index) => $('numbered-format').add(new Option(name, index)));
   $('numbered-series').value = '1';
@@ -32,6 +38,11 @@ export function initializeNumbering(makeBookButton) {
   $('numbered-copy').addEventListener('click', async () => {
     try {
       const [series, format, first, last, physicalOnly] = selection();
+      if (isBuyingView()) {
+        const report = guide();
+        await navigator.clipboard.writeText(`${seriesNames[series]} · ${physicalOnly ? 'Print books' : formats[format] ?? 'Any format'}\n\n${shoppingList(report)}\n\n${report.warnings.join('\n')}`);
+        $('library-status').textContent = 'Buying guide copied.'; return;
+      }
       if (isArcView()) {
         const titles = arcReports().map(report => `${report.arc.name}\n${report.slots.filter(slot => slot.missing).map(slot => `Part ${slot.part.number}: ${slot.part.title}`).join('\n') || 'Complete'}`).join('\n\n');
         await navigator.clipboard.writeText(`${seriesNames[series]} · ${physicalOnly ? 'Print books' : formats[format] ?? 'Any format'}\n\n${titles}`);
@@ -51,15 +62,30 @@ export function clearNumbering() {
 }
 export function renderNumbering(current) {
   clearNumbering(); entries = current;
+  const controls = $('numbered-view').querySelector('.numbered-controls'), actions = $('numbered-view').querySelector('.numbered-actions');
+  const rangeParent = isBuyingView() ? $('buying-range') : controls;
+  for (const id of ['numbered-first', 'numbered-last']) { const label = $(id).closest('label'); if (label.parentNode !== rangeParent) rangeParent.append(label); }
+  const notesParent = isBuyingView() ? $('buying-option-notes') : $('numbered-view');
+  if ($('numbered-hint').parentNode !== notesParent) { if (isBuyingView()) notesParent.append($('numbered-hint')); else notesParent.insertBefore($('numbered-hint'), actions); }
+  const startedParent = isBuyingView() ? $('buying-option-notes') : actions;
+  if ($('arc-started-label').parentNode !== startedParent) startedParent.append($('arc-started-label'));
+  $('buying-options').hidden = !isBuyingView();
   $('numbered-copy').disabled = true;
   $('numbered-review').hidden = true;
   $('numbered-first').closest('label').hidden = $('numbered-last').closest('label').hidden = isArcView();
-  $('arc-started-label').hidden = !isArcView();
+  $('arc-started-label').hidden = !isArcView() && !isBuyingView();
+  $('numbered-only-missing').closest('label').hidden = isBuyingView();
   $('numbered-only-label').textContent = isArcView() ? 'Only missing parts' : 'Only missing numbers';
   $('numbered-copy').textContent = isArcView() ? 'Copy missing titles' : 'Copy missing numbers';
   $('numbered-hint').textContent = isArcView() ? "Complete your multi-part stories. Print books counts paperbacks and hardcovers; an ebook omnibus won't fill a print gap." : 'Print books counts paperbacks and hardcovers. Classic Pocket Books ranges are suggested; adjust for your numbering scheme. Only saved book numbers count; comics are excluded.';
   $('numbered-list').hidden = isArcView();
   $('numbered-tiles').className = isArcView() ? 'arc-reports' : 'numbered-tiles';
+  if (isBuyingView()) {
+    $('numbered-copy').textContent = 'Copy buying guide';
+    $('numbered-hint').textContent = 'Wishlist + missing numbers + story-arc parts. Print counts paperbacks and hardcovers. ISBNs are edition references; reprints may differ.';
+    $('numbered-list').hidden = true; $('numbered-tiles').className = 'buying-list';
+    renderBuyingGuide(); return;
+  }
   if (isArcView()) { renderArcs(); return; }
   let report;
   try { report = numberedReport(entries, ...selection()); }
@@ -105,5 +131,23 @@ function renderArcs() {
     if (report.ownedCount === report.slots.length) panel.append(text('p', 'Complete in this format.', 'arc-progress'));
     if (report.unmatched.length) panel.append(text('p', 'Review unmatched titles: ' + report.unmatched.map(({book}) => book.title).join(' · '), 'numbered-warning'));
     $('numbered-tiles').append(panel);
+  }
+}
+
+function renderBuyingGuide() {
+  if (!arcReference || !novelReference) { $('numbered-summary').append(text('p', arcError || novelError || 'Loading buying guide…', 'hint')); return; }
+  const report = guide();
+  $('numbered-copy').disabled = report.items.length === 0;
+  $('numbered-summary').append(text('h2', `${report.items.length} books to look for`));
+  if (report.warnings.length) {
+    const notes = text('details', '', 'buying-notes'); notes.append(text('summary', 'Matching notes'));
+    report.warnings.forEach(warning => notes.append(text('p', warning, 'hint'))); $('numbered-summary').append(notes);
+  }
+  if (!report.items.length) $('numbered-summary').append(text('p', 'No books needed for these filters.'));
+  for (const item of report.items) {
+    const row = text('article', '', 'buying-row');
+    row.append(text('strong', item.title), text('span', item.formats.join(', '), 'buying-format'), text('span', item.reasons.join(' · '), 'buying-identification'));
+    if (item.isbn) row.append(text('span', `ISBN ${item.isbn}`, 'buying-isbn'));
+    $('numbered-tiles').append(row);
   }
 }

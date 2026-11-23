@@ -8,7 +8,7 @@ on:
         default: false
   push:
     branches: [main]
-    paths: ['src/**', 'cloudflare/public/story-arcs.json', '.github/workflows/ios.yml', 'global.json', 'Directory.Build.props']
+    paths: ['src/**', 'cloudflare/public/story-arcs.json', 'cloudflare/public/numbered-novels.tsv', '.github/workflows/ios.yml', 'global.json', 'Directory.Build.props']
 permissions:
   contents: read
 concurrency:

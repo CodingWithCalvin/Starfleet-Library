@@ -98,12 +98,13 @@
       </section>
       <section id="numbered-view" hidden aria-label="Missing books and story arcs">
         <div class="numbered-controls">
-          <label class="missing-mode">View<select id="missing-view-mode"><option value="numbers">Numbered series</option><option value="arcs">Story arcs</option></select></label>
+          <label class="missing-mode">View<select id="missing-view-mode"><option value="buying">Buying guide</option><option value="numbers">Numbered series</option><option value="arcs">Story arcs</option></select></label>
           <label>Series<select id="numbered-series"></select></label>
           <label>Format<select id="numbered-format"><option value="print">Print books</option><option value="">Any format</option></select></label>
           <label>First number<input id="numbered-first" type="number" min="1" max="1000" step="1" value="1" inputmode="numeric"></label>
           <label>Last number<input id="numbered-last" type="number" min="1" max="1000" step="1" value="63" inputmode="numeric"></label>
         </div>
+        <details id="buying-options" hidden><summary>Range &amp; options</summary><div id="buying-range" class="numbered-controls"></div><div id="buying-option-notes"></div></details>
         <p id="numbered-hint" class="hint">Print books counts paperbacks and hardcovers. Classic Pocket Books ranges are suggested; adjust for your numbering scheme. Only saved book numbers count; comics are excluded.</p>
         <div class="numbered-actions"><label><input id="numbered-only-missing" type="checkbox" checked> <span id="numbered-only-label">Only missing numbers</span></label><label id="arc-started-label" hidden><input id="arc-started" type="checkbox" checked> Only sets I own in this format</label><button id="numbered-copy" class="quiet">Copy missing numbers</button></div>
         <div id="numbered-summary" aria-live="polite"></div>

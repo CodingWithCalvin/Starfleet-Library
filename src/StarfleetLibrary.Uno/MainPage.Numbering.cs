@@ -9,6 +9,7 @@ public sealed partial class MainPage
     private int gapSeries = (int)TrekSeries.NextGeneration, gapFormat, gapFirst = 1, gapLast = 63;
     private bool gapMissingOnly = true, reviewNumbers, reviewBlanksOnly = true, storyArcView, startedArcsOnly = true;
     private string numberingSearch = "";
+    private bool buyingGuideView = true;
     private StackPanel? gapResults;
 
     private void ShowMissingBooks()
@@ -17,28 +18,37 @@ public sealed partial class MainPage
         root.RowDefinitions.Add(new() { Height = GridLength.Auto });
         root.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) });
         var controls = new StackPanel { Spacing = 12 };
-        var view = Picker("MissingView", ["Numbered series", "Story arcs"], storyArcView ? 1 : 0, "View");
-        view.SelectionChanged += (_, _) => { storyArcView = view.SelectedIndex == 1; reviewNumbers = false; Body.Children.Clear(); ShowMissingBooks(); };
+        var view = Picker("MissingView", ["Buying guide", "Numbered series", "Story arcs"], buyingGuideView ? 0 : storyArcView ? 2 : 1, "View");
+        view.SelectionChanged += (_, _) => { buyingGuideView = view.SelectedIndex == 0; storyArcView = view.SelectedIndex == 2; reviewNumbers = false; Body.Children.Clear(); ShowMissingBooks(); };
         controls.Children.Add(view);
         var series = Picker("GapSeries", Enum.GetValues<TrekSeries>().Select(value => value.DisplayName()), gapSeries, "Series");
         var format = Picker("GapFormat", new[] { "Print books", "Any format" }.Concat(Enum.GetValues<BookFormat>().Select(value => value.DisplayName())), gapFormat, "Format");
         controls.Children.Add(Pair(series, format));
+        var options = new StackPanel { Spacing = 12 };
+        var optionParent = buyingGuideView ? options : controls;
+        if (buyingGuideView) controls.Children.Add(new Expander { Header = "Range & options", Content = options, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch });
         var first = Number("First number", "GapFirst", gapFirst);
         var last = Number("Last number", "GapLast", gapLast);
         first.Minimum = last.Minimum = 1; first.Maximum = last.Maximum = NumberedBooks.MaximumNumber;
         if (gapLast == 0) last.Value = double.NaN;
-        if (!storyArcView) controls.Children.Add(Pair(first, last));
-        controls.Children.Add(Text(storyArcView ? "Complete your multi-part stories. Print books counts paperbacks and hardcovers; an ebook omnibus won't fill a print gap." : "Print books counts paperbacks and hardcovers. Classic Pocket Books ranges are suggested; adjust for your numbering scheme. Only saved book numbers count; comics are excluded.", 12));
+        if (!storyArcView) optionParent.Children.Add(Pair(first, last));
+        optionParent.Children.Add(Text(buyingGuideView ? "Wishlist + missing numbers + story-arc parts. ISBNs are edition references; reprints may differ." : storyArcView ? "Complete your multi-part stories. Print books counts paperbacks and hardcovers; an ebook omnibus won't fill a print gap." : "Print books counts paperbacks and hardcovers. Classic Pocket Books ranges are suggested; adjust for your numbering scheme. Only saved book numbers count; comics are excluded.", 12));
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
         var mode = ActionButton(reviewNumbers ? "Show missing numbers" : "Review numbering", (_, _) =>
         {
             reviewNumbers = !reviewNumbers; Body.Children.Clear(); ShowMissingBooks();
         });
-        if (!storyArcView) actions.Children.Add(mode);
-        actions.Children.Add(ActionButton(storyArcView ? "Copy missing titles" : "Copy missing numbers", (_, _) =>
+        if (!storyArcView && !buyingGuideView) actions.Children.Add(mode);
+        actions.Children.Add(ActionButton(buyingGuideView ? "Copy buying guide" : storyArcView ? "Copy missing titles" : "Copy missing numbers", (_, _) =>
         {
             try
             {
+                if (buyingGuideView)
+                {
+                    var guide = BuildBuyingGuide(); var copied = new DataPackage();
+                    copied.SetText($"{((TrekSeries)gapSeries).DisplayName()} · {(gapFormat == 0 ? "Print books" : GapFormat?.DisplayName() ?? "Any format")}\n\n" + guide.ShoppingList + "\n\n" + string.Join("\n", guide.Warnings));
+                    Clipboard.SetContent(copied); ShowNotice("Buying guide copied."); return;
+                }
                 if (storyArcView)
                 {
                     var arcData = new DataPackage(); arcData.SetText(string.Join("\n\n", ArcReports().Select(report => report.Arc.Name + "\n" + (report.MissingTitles.Length > 0 ? report.MissingTitles : "Complete"))));
@@ -53,11 +63,11 @@ public sealed partial class MainPage
         controls.Children.Add(actions);
         var toggle = new CheckBox { Content = storyArcView ? "Only missing parts" : reviewNumbers ? "Only blank or invalid numbers" : "Only missing numbers", IsChecked = reviewNumbers ? reviewBlanksOnly : gapMissingOnly };
         toggle.Click += (_, _) => { if (reviewNumbers) reviewBlanksOnly = toggle.IsChecked == true; else gapMissingOnly = toggle.IsChecked == true; RefreshNumberedBooks(); };
-        controls.Children.Add(toggle);
-        if (storyArcView)
+        if (!buyingGuideView) controls.Children.Add(toggle);
+        if (storyArcView || buyingGuideView)
         {
             var started = new CheckBox { Content = "Only sets I own in this format", IsChecked = startedArcsOnly };
-            started.Click += (_, _) => { startedArcsOnly = started.IsChecked == true; RefreshNumberedBooks(); }; controls.Children.Add(started);
+            started.Click += (_, _) => { startedArcsOnly = started.IsChecked == true; RefreshNumberedBooks(); }; optionParent.Children.Add(started);
         }
         if (reviewNumbers)
         {
@@ -86,6 +96,7 @@ public sealed partial class MainPage
     {
         if (section != "Missing books" || gapResults is null || detailOpen) return;
         gapResults.Children.Clear();
+        if (buyingGuideView) { ShowBuyingGuide(); return; }
         if (storyArcView) { ShowArcResults(); return; }
         if (reviewNumbers)
         {
@@ -131,6 +142,27 @@ public sealed partial class MainPage
             tiles.Children.Add(tile);
         }
         gapResults.Children.Add(tiles);
+    }
+
+    private BuyingGuideReport BuildBuyingGuide() => BuyingGuide.Build(store.Books, (TrekSeries)gapSeries, GapFormat, gapFirst, gapLast, gapFormat == 0, startedArcsOnly);
+
+    private void ShowBuyingGuide()
+    {
+        var report = BuildBuyingGuide();
+        gapResults!.Children.Add(Text($"{report.Items.Length} books to look for", 20, "#17243B", true));
+        if (report.Warnings.Length > 0) gapResults.Children.Add(new Expander { Header = "Matching notes", Content = Text(string.Join("\n", report.Warnings), 12, "#9B552B"), HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch });
+        if (report.Items.Length == 0) gapResults.Children.Add(Text("No books needed for these filters."));
+        foreach (var item in report.Items)
+        {
+            var row = new Grid { ColumnSpacing = 16, RowSpacing = 4 };
+            row.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); row.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
+            row.RowDefinitions.Add(new() { Height = GridLength.Auto }); row.RowDefinitions.Add(new() { Height = GridLength.Auto });
+            var title = Text(item.Title, 16, "#17243B", true); title.IsTextSelectionEnabled = true; row.Children.Add(title);
+            var format = Text(item.FormatLabel, 12, "#147077", true); Grid.SetColumn(format, 1); row.Children.Add(format);
+            var identifiers = Text(item.Identification + (item.Isbn.Length > 0 ? " · ISBN " + item.Isbn : ""), 12);
+            identifiers.IsTextSelectionEnabled = true; Grid.SetRow(identifiers, 1); Grid.SetColumnSpan(identifiers, 2); row.Children.Add(identifiers);
+            gapResults.Children.Add(new Border { Child = row, Padding = new(0, 0, 0, 12), BorderThickness = new(0, 0, 0, 1), BorderBrush = Brush("#DCE3E8") });
+        }
     }
 
     private StoryArcReport[] ArcReports() => StoryArcs.Reference.Where(arc => arc.Series.Contains((TrekSeries)gapSeries))

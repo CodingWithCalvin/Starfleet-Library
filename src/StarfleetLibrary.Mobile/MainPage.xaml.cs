@@ -87,7 +87,7 @@ public sealed partial class MainPage : Page
         AutomationProperties.SetName(search,"Search your library");
         search.TextChanged+=(_,_)=>{query=search.Text;Refresh();};controls.Children.Add(search);
         controls.Children.Add(Btn("Scan ISBN / barcode",ScanClicked));
-        controls.Children.Add(Btn("Missing books / story arcs",(_,_)=>ShowNumbering()));
+        controls.Children.Add(Btn("Buying guide / missing books",(_,_)=>ShowNumbering()));
         var filters=new Grid { ColumnSpacing=8 };
         filters.ColumnDefinitions.Add(new(){Width=new(1,GridUnitType.Star)});filters.ColumnDefinitions.Add(new(){Width=new(1,GridUnitType.Star)});filters.ColumnDefinitions.Add(new(){Width=GridLength.Auto});
         var types=Pick(["All types","Books","Comics"],type);AutomationProperties.SetName(types,"Book or comic filter");

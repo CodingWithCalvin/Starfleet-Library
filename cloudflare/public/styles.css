@@ -857,3 +857,15 @@ display:none}
   .nav-button { min-width:0; padding:10px 8px; font-size:12px; gap:6px; }
   .nav-button .count { padding:3px 5px; font-size:10px; }
 }
+
+.buying-list { display: flex; flex-direction: column; }
+.buying-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 14px; padding: 12px 2px; border-bottom: 1px solid #dce3e8; }
+.buying-row strong { color: #17243b; font-size: 1rem; overflow-wrap: anywhere; }
+.buying-format { color: #147077; font-size: .82rem; font-weight: 650; }
+.buying-identification, .buying-isbn { font-size: .8rem; color: #546174; }
+.buying-isbn { font-variant-numeric: tabular-nums; }
+.buying-notes { margin-bottom: 10px; font-size: .82rem; color: #9b552b; }
+#buying-options { margin: 14px 0; font-size: .85rem; color: #546174; }
+#buying-options summary { cursor: pointer; }
+#buying-range { margin-top: 14px; }
+@media(max-width: 550px) { .buying-identification, .buying-isbn { grid-column: 1 / -1; } }
