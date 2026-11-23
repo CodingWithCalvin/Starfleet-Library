@@ -6,4 +6,8 @@
     <IsTrimmable>true</IsTrimmable>
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
   </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="NumberedNovels.tsv" LogicalName="StarfleetLibrary.NumberedNovels.tsv" />
+    <EmbeddedResource Include="..\..\cloudflare\public\story-arcs.json" LogicalName="StarfleetLibrary.StoryArcs.json" />
+  </ItemGroup>
 </Project>

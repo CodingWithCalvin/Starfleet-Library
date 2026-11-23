@@ -48,7 +48,7 @@ public sealed partial class MainPage : Page
             using var privateHttp=settings.CreateClient();
             await store.SyncAsync(privateHttp);
             SyncStatus.Content = store.Conflicts.Length > 0 ? $"{store.Conflicts.Length} changes need review · Tap here" : $"Synced {DateTime.Now:t} · Catalog saved here";
-            if (!editing && !detail && !scanning) Refresh();
+            if (!editing && !detail && !scanning) { if (numbering) RefreshNumbering(); else Refresh(); }
         }
         catch { SyncStatus.Content = store.LastSync is not null ? "Offline · Changes saved here · Tap to retry" : "Connect to load your library · Tap to retry"; }
         finally { syncing = false; }
@@ -76,7 +76,7 @@ public sealed partial class MainPage : Page
 
     private void ShowShelf()
     {
-        editing=detail=false;
+        editing=detail=numbering=false;
         Heading.Text=shelf == OwnershipStatus.Owned ? "Your collection" : "Your wishlist";
         CollectionNav.Background=Brush(shelf == OwnershipStatus.Owned ? "#E5F1F0" : "#FFFFFF");
         WishlistNav.Background=Brush(shelf == OwnershipStatus.Wishlist ? "#E5F1F0" : "#FFFFFF");
@@ -87,6 +87,7 @@ public sealed partial class MainPage : Page
         AutomationProperties.SetName(search,"Search your library");
         search.TextChanged+=(_,_)=>{query=search.Text;Refresh();};controls.Children.Add(search);
         controls.Children.Add(Btn("Scan ISBN / barcode",ScanClicked));
+        controls.Children.Add(Btn("Missing books / story arcs",(_,_)=>ShowNumbering()));
         var filters=new Grid { ColumnSpacing=8 };
         filters.ColumnDefinitions.Add(new(){Width=new(1,GridUnitType.Star)});filters.ColumnDefinitions.Add(new(){Width=new(1,GridUnitType.Star)});filters.ColumnDefinitions.Add(new(){Width=GridLength.Auto});
         var types=Pick(["All types","Books","Comics"],type);AutomationProperties.SetName(types,"Book or comic filter");
@@ -111,7 +112,7 @@ public sealed partial class MainPage : Page
     }
     private void Refresh()
     {
-        if (list is null || editing || detail) return;
+        if (list is null || editing || detail || numbering) return;
         var books=store.Books.Where(b=>b.Ownership==shelf).Where(b=>type==0 || b.Kind==(type==1 ? BookKind.Book : BookKind.Comic))
             .Where(b=>format==0 || (int)b.Format==format-1)
             .Where(b=>query.Split(' ',StringSplitOptions.RemoveEmptyEntries).All(term=>$"{b.Title} {b.Authors} {b.Isbn} {b.Series.DisplayName()} {b.CatalogLabel()}".Contains(term,StringComparison.OrdinalIgnoreCase)))
@@ -127,10 +128,10 @@ public sealed partial class MainPage : Page
         var book=store.Books.FirstOrDefault(x=>x.Id==stale.Id) ?? stale;
         Heading.Text="Edition details";
         detail=true;editing=false;
-        var panel=PagePanel("Back to "+(shelf==OwnershipStatus.Owned ? "collection" : "wishlist"),(_,_)=>ShowShelf());
+        var panel=PagePanel("Back to "+(numbering ? "missing books" : shelf==OwnershipStatus.Owned ? "collection" : "wishlist"),(_,_)=>ReturnToShelf());
         var image=new Image { Height=240,Stretch=Stretch.Uniform,HorizontalAlignment=HorizontalAlignment.Center };
         if (CoverUrl(book) is { } cover) image.Source=new BitmapImage(new Uri(cover));panel.Children.Add(image);
-        panel.Children.Add(Txt(book.CatalogLabel(),12,"#147077",true));panel.Children.Add(Txt(book.Title,26,"#17243B",true));panel.Children.Add(Txt(book.Authors,16));
+        panel.Children.Add(Txt(book.CatalogLabel()+(book.BookNumber.Length>0 ? " · #"+book.BookNumber.TrimStart('#') : ""),12,"#147077",true));panel.Children.Add(Txt(book.Title,26,"#17243B",true));panel.Children.Add(Txt(book.Authors,16));
         panel.Children.Add(Txt($"{book.Format.DisplayName()} · {book.Ownership.DisplayName()}",16,"#147077",true));
         var copies=store.Books.Where(copy=>CoverGroups.SameGroup(book,copy)).OrderBy(copy=>copy.AddedAt).ThenBy(copy=>copy.Id).ToArray();
         if(copies.Length>1)
@@ -150,14 +151,15 @@ public sealed partial class MainPage : Page
     {
         var expected = isNew ? null : original with { };
         editing=true;detail=false;Heading.Text=isNew ? "Add an edition" : "Edit edition";
-        var panel=PagePanel("Cancel",async (_,_)=>{if(await LeaveEditor())ShowShelf();});
+        var panel=PagePanel("Cancel",async (_,_)=>{if(await LeaveEditor())ReturnToShelf();});
         var isbn=Field(panel,"ISBN (optional)",original.Isbn);var title=Field(panel,"Title",original.Title);var authors=Field(panel,"Author(s)",original.Authors);
+        var number=Field(panel,"Book number (optional)",original.BookNumber);
         var series=Pick(Enum.GetValues<TrekSeries>().Select(x=>x.DisplayName()).ToArray(),(int)original.Series);Label(panel,"Series",series);
         var formatPicker=Pick(Enum.GetValues<BookFormat>().Select(x=>x.DisplayName()).ToArray(),(int)original.Format);Label(panel,"Format",formatPicker);
         var kind=Pick(["Book","COMIC"],(int)original.Kind);Label(panel,"Type",kind);
         var ownership=Pick(["Collection","Wishlist"],(int)original.Ownership);Label(panel,"Save to",ownership);
         var notes=Field(panel,"Notes",original.Notes);notes.AcceptsReturn=true;notes.TextWrapping=TextWrapping.Wrap;notes.MinHeight=90;
-        var status=Txt("",13,"#9B452C");panel.Children.Add(status);
+        var status=Txt("",13,"#9B452C");panel.Children.Insert(3,status);
         var lookup=Btn("Look up ISBN",async (_,_)=>
         {
             try
@@ -166,14 +168,15 @@ public sealed partial class MainPage : Page
                 if(matches.Count>0)status.Text="Already in your library: "+string.Join(", ",matches.Select(b=>$"{b.Title} ({b.Format.DisplayName()}, {b.Ownership.DisplayName()})"));
                 var found=await new ISBNLookup(http).FindAsync(isbn.Text);
                 title.Text=found.Title;authors.Text=found.Authors;series.SelectedIndex=(int)found.Series;
+                if(found.BookNumber.Length>0)number.Text=found.BookNumber;
                 original=original with { Publisher=found.Publisher,PublicationYear=found.PublicationYear,PageCount=found.PageCount,CoverUrl=found.CoverUrl };
-                if(matches.Count==0)status.Text="Details found. Check the edition and format before saving.";
+                if(matches.Count==0)status.Text=found.BookNumber.Length>0 ? $"Found {found.Series.ShortName()} #{found.BookNumber}. Check the edition before saving." : "Details found. No reliable book number was found; enter it from the cover if numbered.";
             }
             catch(Exception ex){status.Text=ex.Message;}
-        });panel.Children.Insert(1,lookup);
+        });panel.Children.Insert(3,lookup);
         panel.Children.Add(Btn("Save edition",async (_,_)=>
         {
-            var book=original with { Title=title.Text.Trim(),Authors=authors.Text.Trim(),Isbn=IsbnUtility.Normalize(isbn.Text),Series=(TrekSeries)series.SelectedIndex,Format=(BookFormat)formatPicker.SelectedIndex,Kind=(BookKind)kind.SelectedIndex,Ownership=(OwnershipStatus)ownership.SelectedIndex,Notes=notes.Text.Trim() };
+            var book=original with { Title=title.Text.Trim(),Authors=authors.Text.Trim(),Isbn=IsbnUtility.Normalize(isbn.Text),BookNumber=number.Text.Trim(),Series=(TrekSeries)series.SelectedIndex,Format=(BookFormat)formatPicker.SelectedIndex,Kind=(BookKind)kind.SelectedIndex,Ownership=(OwnershipStatus)ownership.SelectedIndex,Notes=notes.Text.Trim() };
             if(book.ValidationError is { } error){status.Text=error;return;}
             var duplicates=CatalogMatcher.ExactMatches(book.Isbn,store.Books).Where(b=>b.Id!=book.Id).ToArray();
             if(duplicates.Length>0 && !await Confirm("Another copy is already saved",string.Join("\n",duplicates.Select(b=>$"{b.Title} · {b.Format.DisplayName()} · {b.Ownership.DisplayName()}")),"Save separate copy"))return;

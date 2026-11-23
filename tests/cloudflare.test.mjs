@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
-import {readFileSync} from 'node:fs';
+import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../cloudflare/worker.js';
 import {preparePasswordLogin, deriveLogin, unlockPasswordKey} from '../cloudflare/public/password.js';
 import {vaultCrypto} from '../cloudflare/public/crypto.js';
@@ -40,6 +40,10 @@ test('public shell contains no catalog and sends restrictive browser headers',as
  assert.match(response.headers.get('Content-Security-Policy'),/connect-src 'self'/);
  assert.match(response.headers.get('Content-Security-Policy'),/frame-ancestors 'none'/);
  assert.equal(response.headers.get('Access-Control-Allow-Origin'),null);
+ for(const file of readdirSync(new URL('../cloudflare/public/',import.meta.url))) {
+  const asset=await worker.fetch(new Request('https://vault.test/'+file),{...env,DEVICE_TOKEN_HASHES:''});
+  assert.equal(asset.status,200,'Reader asset must be accessible before sign-in: '+file);
+ }
  assert.equal((await worker.fetch(new Request('https://vault.test/private-sync-access.bin'),env)).status,401);
  assert.equal((await worker.fetch(new Request('https://vault.test/',{method:'POST'}),env)).status,405);
 });

@@ -1,0 +1,370 @@
+[
+  {
+    "id": "double-helix",
+    "name": "Double Helix",
+    "series": [
+      1
+    ],
+    "parts": [
+      {
+        "number": 1,
+        "title": "Infection",
+        "isbns": [
+          "0671032550"
+        ],
+        "aliases": []
+      },
+      {
+        "number": 2,
+        "title": "Vectors",
+        "isbns": [
+          "0671032569"
+        ],
+        "aliases": []
+      },
+      {
+        "number": 3,
+        "title": "Red Sector",
+        "isbns": [
+          "0671032577"
+        ],
+        "aliases": []
+      },
+      {
+        "number": 4,
+        "title": "Quarantine",
+        "isbns": [
+          "0671034774"
+        ],
+        "aliases": []
+      },
+      {
+        "number": 5,
+        "title": "Double or Nothing",
+        "isbns": [
+          "0671034782"
+        ],
+        "aliases": []
+      },
+      {
+        "number": 6,
+        "title": "The First Virtue",
+        "isbns": [
+          "0671032585"
+        ],
+        "aliases": []
+      }
+    ],
+    "omnibusTitles": [
+      "Double Helix Omnibus"
+    ],
+    "omnibusIsbns": [
+      "9780743473934"
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/List_of_Star_Trek:_The_Next_Generation_novels",
+      "https://www.simonandschuster.com/books/Double-Helix-Omnibus/Peter-David/Star-Trek/9780743473934"
+    ]
+  },
+  {
+    "id": "q-continuum",
+    "name": "The Q Continuum",
+    "series": [
+      1
+    ],
+    "parts": [
+      {
+        "number": 1,
+        "title": "Q-Space",
+        "isbns": [
+          "0671019155"
+        ],
+        "aliases": []
+      },
+      {
+        "number": 2,
+        "title": "Q-Zone",
+        "isbns": [
+          "067101921X"
+        ],
+        "aliases": []
+      },
+      {
+        "number": 3,
+        "title": "Q-Strike",
+        "isbns": [
+          "0671019228"
+        ],
+        "aliases": []
+      }
+    ],
+    "omnibusTitles": [
+      "The Q Continuum Omnibus"
+    ],
+    "omnibusIsbns": [],
+    "sources": [
+      "https://en.wikipedia.org/wiki/List_of_Star_Trek:_The_Next_Generation_novels",
+      "https://www.simonandschuster.com/p/star-trek-q-books"
+    ]
+  },
+  {
+    "id": "genesis-wave",
+    "name": "The Genesis Wave",
+    "series": [
+      1
+    ],
+    "parts": [
+      {
+        "number": 1,
+        "title": "The Genesis Wave, Book One",
+        "isbns": [
+          "0743411803"
+        ],
+        "aliases": [
+          "Genesis Wave Book 1"
+        ]
+      },
+      {
+        "number": 2,
+        "title": "The Genesis Wave, Book Two",
+        "isbns": [
+          "0743411811"
+        ],
+        "aliases": [
+          "Genesis Wave Book 2"
+        ]
+      },
+      {
+        "number": 3,
+        "title": "The Genesis Wave, Book Three",
+        "isbns": [
+          "0743443756"
+        ],
+        "aliases": [
+          "Genesis Wave Book 3"
+        ]
+      }
+    ],
+    "omnibusTitles": [],
+    "omnibusIsbns": [],
+    "sources": [
+      "https://en.wikipedia.org/wiki/List_of_Star_Trek:_The_Next_Generation_novels"
+    ]
+  },
+  {
+    "id": "cold-equations",
+    "name": "Cold Equations",
+    "series": [
+      1
+    ],
+    "parts": [
+      {
+        "number": 1,
+        "title": "The Persistence of Memory",
+        "isbns": [
+          "9781451650723"
+        ],
+        "aliases": []
+      },
+      {
+        "number": 2,
+        "title": "Silent Weapons",
+        "isbns": [
+          "9781451650730"
+        ],
+        "aliases": []
+      },
+      {
+        "number": 3,
+        "title": "The Body Electric",
+        "isbns": [
+          "9781451650747"
+        ],
+        "aliases": []
+      }
+    ],
+    "omnibusTitles": [],
+    "omnibusIsbns": [],
+    "sources": [
+      "https://en.wikipedia.org/wiki/List_of_Star_Trek:_The_Next_Generation_novels"
+    ]
+  },
+  {
+    "id": "a-time-to",
+    "name": "A Time to...",
+    "series": [
+      1
+    ],
+    "parts": [
+      {
+        "number": 1,
+        "title": "A Time to Be Born",
+        "isbns": [
+          "0743467655"
+        ],
+        "aliases": []
+      },
+      {
+        "number": 2,
+        "title": "A Time to Die",
+        "isbns": [
+          "0743467663"
+        ],
+        "aliases": []
+      },
+      {
+        "number": 3,
+        "title": "A Time to Sow",
+        "isbns": [
+          "0743482999"
+        ],
+        "aliases": []
+      },
+      {
+        "number": 4,
+        "title": "A Time to Harvest",
+        "isbns": [
+          "0743482980"
+        ],
+        "aliases": []
+      },
+      {
+        "number": 5,
+        "title": "A Time to Love",
+        "isbns": [
+          "0743462858"
+        ],
+        "aliases": []
+      },
+      {
+        "number": 6,
+        "title": "A Time to Hate",
+        "isbns": [
+          "0743462890"
+        ],
+        "aliases": []
+      },
+      {
+        "number": 7,
+        "title": "A Time to Kill",
+        "isbns": [
+          "0743491777"
+        ],
+        "aliases": []
+      },
+      {
+        "number": 8,
+        "title": "A Time to Heal",
+        "isbns": [
+          "0743491785"
+        ],
+        "aliases": []
+      },
+      {
+        "number": 9,
+        "title": "A Time for War, a Time for Peace",
+        "isbns": [
+          "0743491793"
+        ],
+        "aliases": []
+      }
+    ],
+    "omnibusTitles": [],
+    "omnibusIsbns": [],
+    "sources": [
+      "https://en.wikipedia.org/wiki/List_of_Star_Trek:_The_Next_Generation_novels"
+    ]
+  },
+  {
+    "id": "millennium",
+    "name": "Millennium",
+    "series": [
+      2
+    ],
+    "parts": [
+      {
+        "number": 1,
+        "title": "The Fall of Terok Nor",
+        "isbns": [
+          "0671024019"
+        ],
+        "aliases": []
+      },
+      {
+        "number": 2,
+        "title": "The War of the Prophets",
+        "isbns": [
+          "0671024027"
+        ],
+        "aliases": []
+      },
+      {
+        "number": 3,
+        "title": "Inferno",
+        "isbns": [
+          "0671024035"
+        ],
+        "aliases": []
+      }
+    ],
+    "omnibusTitles": [
+      "Millennium Omnibus",
+      "Millennium: Fall of Terok Nor/War of the Prophets/Inferno (Star Trek: Deep Space Nine)",
+      "Millennium: The Fall of Terok Nor/The War of the Prophets/Inferno"
+    ],
+    "omnibusIsbns": [
+      "9780743442497"
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/List_of_Star_Trek:_Deep_Space_Nine_novels"
+    ]
+  },
+  {
+    "id": "destiny",
+    "name": "Destiny",
+    "series": [
+      1,
+      2,
+      3,
+      4,
+      7
+    ],
+    "parts": [
+      {
+        "number": 1,
+        "title": "Gods of Night",
+        "isbns": [
+          "9781416551713"
+        ],
+        "aliases": []
+      },
+      {
+        "number": 2,
+        "title": "Mere Mortals",
+        "isbns": [
+          "9781416551720"
+        ],
+        "aliases": []
+      },
+      {
+        "number": 3,
+        "title": "Lost Souls",
+        "isbns": [
+          "9781416551751"
+        ],
+        "aliases": []
+      }
+    ],
+    "omnibusTitles": [
+      "Destiny Omnibus",
+      "Destiny: The Complete Saga"
+    ],
+    "omnibusIsbns": [
+      "9781451657241"
+    ],
+    "sources": [
+      "https://www.simonandschuster.net/books/Star-Trek-Destiny/David-Mack/Star-Trek-The-Next-Generation/9781451657241",
+      "https://en.wikipedia.org/wiki/List_of_Star_Trek_novels"
+    ]
+  }
+]

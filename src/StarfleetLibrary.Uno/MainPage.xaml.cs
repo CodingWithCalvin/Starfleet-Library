@@ -38,6 +38,7 @@ public sealed partial class MainPage : Page
         AddNavigation("Collection", "\uE8F1");
         AddNavigation("Reading now", "\uE736");
         AddNavigation("Wishlist", "\uEB51");
+        AddNavigation("Missing books", "\uE9D9");
         NavItems.Children.Add(new Border { Height = 1, Background = Brush("#2A3A50"), Margin = new(10, 20, 10, 20) });
         AddNavigation("Find by ISBN", "\uE721");
         AddNavigation("Insights", "\uE9D9");
@@ -90,8 +91,8 @@ public sealed partial class MainPage : Page
         Notice.IsOpen = false;
         foreach (var nav in navigation) nav.Button.Background = Brush(nav.Key == section ? "#293C55" : "#00101D32");
         SettingsNav.Background = Brush(section == "Settings" ? "#293C55" : "#00101D32");
-        PageTitle.Text = section switch { "Collection" => "Your collection", "Reading now" => "On your nightstand", "Wishlist" => "The next adventure", "Find by ISBN" => "Find your next story", "Insights" => "Your reading universe", _ => "Make yourself at home" };
-        PageSubtitle.Text = section switch { "Collection" => "Every edition. Every adventure.", "Reading now" => "Pick up where you left off.", "Wishlist" => "A little space for the stories still to come.", "Find by ISBN" => "Check your shelves before adding another edition.", "Insights" => "A closer look at the stories on your shelves.", _ => "Your library, stored locally and under your control." };
+        PageTitle.Text = section switch { "Missing books" => "Fill the gaps", "Collection" => "Your collection", "Reading now" => "On your nightstand", "Wishlist" => "The next adventure", "Find by ISBN" => "Find your next story", "Insights" => "Your reading universe", _ => "Make yourself at home" };
+        PageSubtitle.Text = section switch { "Missing books" => "Numbered series and multi-part stories.", "Collection" => "Every edition. Every adventure.", "Reading now" => "Pick up where you left off.", "Wishlist" => "A little space for the stories still to come.", "Find by ISBN" => "Check your shelves before adding another edition.", "Insights" => "A closer look at the stories on your shelves.", _ => "Your library, stored locally and under your control." };
         Body.Children.Clear();
         itemView = null;
         tableGrid = null;
@@ -99,6 +100,7 @@ public sealed partial class MainPage : Page
         {
             case "Settings": ShowSettings(); break;
             case "Insights": ShowInsights(); break;
+            case "Missing books": ShowMissingBooks(); break;
             case "Find by ISBN": ShowLookup(); break;
             default: ShowCatalog(); break;
         }

@@ -2,7 +2,7 @@ name: Windows desktop
 on:
   push:
     branches: [main]
-    paths: ['src/**', 'tests/**', '.github/workflows/windows.yml', 'global.json', 'Directory.Build.props']
+    paths: ['src/**', 'tests/**', 'cloudflare/public/story-arcs.json', '.github/workflows/windows.yml', 'global.json', 'Directory.Build.props']
   workflow_dispatch:
 permissions:
   contents: read

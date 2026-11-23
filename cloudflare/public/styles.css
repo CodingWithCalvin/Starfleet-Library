@@ -826,3 +826,34 @@ display:none}
 }
 
 #login-form .primary { margin-top: 22px; }
+.numbered-controls { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-bottom:16px; }
+.numbered-controls label { display:grid; gap:8px; min-width:0; font-size:13px; font-weight:600; }
+.numbered-controls input,.numbered-controls select { width:100%; min-width:0; }
+.numbered-actions { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; margin:24px 0; }
+.numbered-actions label { display:flex; align-items:center; gap:8px; font-size:13px; }
+.numbered-actions input { width:18px; height:18px; margin:0; padding:0; }
+#numbered-summary h2 { font-size:20px; line-height:1.4; }
+.numbered-warning { color:#924d25; background:#fff0e5; padding:14px 18px; border-radius:8px; }
+.numbered-list { padding:18px; border:1px solid var(--line); border-radius:10px; background:white; line-height:1.9; }
+.numbered-tiles { display:grid; grid-template-columns:repeat(auto-fill,minmax(115px,1fr)); gap:12px; }
+.numbered-tile { padding:16px; border-radius:10px; display:flex; flex-direction:column; gap:6px; font-size:12px; }
+.numbered-tile strong { font-size:22px; color:var(--ink); }
+.numbered-tile.missing { background:#fff0e5; color:#924d25; }
+.numbered-tile.owned { background:#e4f0ef; color:#147077; }
+#numbered-review { margin-top:32px; }
+#numbered-review summary { font-weight:600; cursor:pointer; padding:14px 0; line-height:1.5; }
+.numbered-review-row { padding:14px 0; border-bottom:1px solid var(--line); }
+.numbered-review-row p { margin:6px 0 0; }
+.missing-mode { grid-column:1/-1; }
+.arc-reports { display:grid; gap:20px; }
+.arc-report { background:white; border:1px solid var(--line); border-radius:12px; padding:22px; }
+.arc-report h3 { font-size:22px; margin-bottom:10px; }
+.arc-progress { color:#147077; }
+.arc-part { padding:12px 0; border-top:1px solid var(--line); }
+.arc-part p { margin:6px 0 0; font-size:13px; }
+.arc-missing { color:#924d25; }
+@media(max-width:700px) {
+  .sidebar nav { gap:6px; }
+  .nav-button { min-width:0; padding:10px 8px; font-size:12px; gap:6px; }
+  .nav-button .count { padding:3px 5px; font-size:10px; }
+}

@@ -1,12 +1,14 @@
 import {parseConnection, vaultCrypto, openConnection} from './crypto.js';
 import {deriveLogin, preparePasswordLogin, unlockPasswordKey} from './password.js';
 import {seriesNames, formats, readingStates, catalogLabel, filterBooks, groupCovers, sameCoverGroup, sameCoverTitle} from './catalog.js';
+import {initializeNumbering, renderNumbering, clearNumbering} from './numbering.js';
 
 const $ = id => document.getElementById(id);
 const storageKey = 'starfleet-reader-connection-v1';
 let active = null;
 let entries = [];
 let ownership = 0;
+let missingView = false;
 let layout = 'covers';
 let refreshing = false;
 let lastUpdated = 0;
@@ -209,6 +211,7 @@ function lock(message = '') {
   coverUrls.clear();
   coverRequests.clear();
   $('results').replaceChildren();
+  clearNumbering();
   $('detail-content').replaceChildren();
   $('details').close();
   $('library-password').value = $('password').value = $('new-password').value = $('confirm-password').value = $('connection').value = '';
@@ -321,15 +324,18 @@ function render() {
   const visible = filterBooks(entries, currentFilters);
   const groups = layout === 'covers' ? groupCovers(visible) : visible.map(entry => [entry]);
   const count = entries.filter(row => row.book.ownership === ownership).length;
-  const name = ownership === 0 ? 'Collection' : 'Wishlist';
+  const name = missingView ? 'Missing books' : ownership === 0 ? 'Collection' : 'Wishlist';
   $('collection-count').textContent = entries.filter(row => row.book.ownership === 0).length;
   $('wishlist-count').textContent = entries.filter(row => row.book.ownership === 1).length;
   $('section-title').textContent = name;
-  $('section-description').textContent = ownership === 0 ? 'Every edition. Every adventure. All in one place.' : 'The next chapters of your collection.';
-  for (const [id, selected] of [['collection-tab', ownership === 0], ['wishlist-tab', ownership === 1]]) {
+  $('section-description').textContent = missingView ? 'Numbered series and multi-part stories.' : ownership === 0 ? 'Every edition. Every adventure. All in one place.' : 'The next chapters of your collection.';
+  for (const [id, selected] of [['collection-tab', !missingView && ownership === 0], ['wishlist-tab', !missingView && ownership === 1], ['numbered-tab', missingView]]) {
     $(id).classList.toggle('active', selected);
     if (selected) $(id).setAttribute('aria-current', 'page'); else $(id).removeAttribute('aria-current');
   }
+  $('catalog-view').hidden = missingView;
+  $('numbered-view').hidden = !missingView;
+  if (missingView) { renderNumbering(entries); return; }
   $('result-count').textContent = layout === 'covers' ? `${groups.length} ${groups.length === 1 ? 'cover' : 'covers'} · ${visible.length} of ${count} ${count === 1 ? 'copy' : 'copies'}` : `${visible.length} of ${count} editions`;
   $('updated').textContent = 'Updated ' + new Date(lastUpdated).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
   const target = $('results');
@@ -382,7 +388,9 @@ $('clear').addEventListener('click', () => {
   for (const id of ['search', 'series', 'format', 'kind', 'reading']) $(id).value = '';
   $('sort').value = 'title'; render();
 });
-for (const [id, value] of [['collection-tab', 0], ['wishlist-tab', 1]]) $(id).addEventListener('click', () => { ownership = value; render(); });
+for (const [id, value] of [['collection-tab', 0], ['wishlist-tab', 1]]) $(id).addEventListener('click', () => { ownership = value; missingView = false; render(); });
+$('numbered-tab').addEventListener('click', () => { missingView = true; render(); });
+initializeNumbering(bookButton);
 for (const button of document.querySelectorAll('[data-layout]')) button.addEventListener('click', () => {
   layout = button.dataset.layout;
   for (const item of document.querySelectorAll('[data-layout]')) item.setAttribute('aria-pressed', String(item === button));
@@ -446,7 +454,7 @@ function openDetails(entry, push = true) {
   const others = entries.filter(row => !sameCoverGroup(book, row.book) && sameCoverTitle(book, row.book));
   if (others.length) content.append(element('p', 'detail-other', 'Other editions: ' + others.map(row => `${formats[row.book.format]} (${row.book.ownership === 0 ? 'owned' : 'wishlist'})`).join(' · ')));
   if (book.notes) { const notes = element('div', 'detail-notes'); notes.append(element('h3', '', 'YOUR NOTES'), element('p', '', book.notes)); content.append(notes); }
-  $('back').textContent = '← Back to ' + (ownership === 0 ? 'collection' : 'wishlist');
+  $('back').textContent = '← Back to ' + (missingView ? 'missing books' : ownership === 0 ? 'collection' : 'wishlist');
   if (push) history.pushState({bookId: entry.id}, '', '#book-' + entry.id);
   if (!$('details').open) $('details').showModal();
   $('back').focus();

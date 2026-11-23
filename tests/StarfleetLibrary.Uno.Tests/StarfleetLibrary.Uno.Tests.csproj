@@ -4,5 +4,6 @@
     <ProjectReference Include="..\..\src\StarfleetLibrary.Core\StarfleetLibrary.Core.csproj" />
     <ProjectReference Include="..\..\src\StarfleetLibrary.Sync\StarfleetLibrary.Sync.csproj" />
     <Compile Include="..\..\src\StarfleetLibrary.Uno\Services\UnoLibraryStore.cs" Link="UnoLibraryStore.cs" />
+    <Compile Include="..\..\src\StarfleetLibrary.Uno\Services\ISBNLookup.cs" Link="ISBNLookup.cs" />
   </ItemGroup>
 </Project>

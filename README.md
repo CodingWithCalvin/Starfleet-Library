@@ -10,6 +10,9 @@ The repository includes the desktop app, mobile app, shared library code, sync s
 - Cover tiles combine copies with the same title and format, ignoring capitalization and extra spaces, and show a copy count. Details let you choose each copy; card, table and list layouts retain separate records. Counts follow the current filters and keep Collection and Wishlist separate.
 - Search and filters for series, reading status, format and books/comics, including COMIC and SNW labels.
 - Owned books, wishlist, ISBN lookup and duplicate checks.
+- ISBN lookup is at the top of Add/Edit and fills the main series book number when a verified ISBN or explicit series-metadata match is available. Unknown or ambiguous numbers stay blank.
+- **Missing books** shows gaps in numbered series by format on Windows, iPhone and the browser. Duplicate copies count once; wishlist entries remain marked as missing. Windows **Review numbering** offers quick edits and known ISBN matches. [Numbering guide and reference sources](docs/NUMBERED-BOOKS.md).
+- Switch Missing books to **Story arcs** to find missing parts by title. The initial seven sets include Double Helix, The Q Continuum, The Genesis Wave, Cold Equations, A Time to..., Millennium and Destiny. Both views filter by Series and Format, defaulting to **Print books** (paperback + hardcover). An ebook omnibus does not fill a print gap.
 - Edition metadata, reading progress, ratings, finish dates, notes and insights.
 - Local cover storage, offline image caching, JSON export and restore.
 - Native iPhone Collection and Wishlist, Apple camera ISBN/UPC barcode scanning, and manual entry.

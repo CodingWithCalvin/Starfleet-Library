@@ -70,12 +70,15 @@
       <nav aria-label="Library sections">
         <button id="collection-tab" class="nav-button active" aria-current="page"><span>Collection</span><span id="collection-count" class="count">0</span></button>
         <button id="wishlist-tab" class="nav-button"><span>Wishlist</span><span id="wishlist-count" class="count">0</span></button>
+        <button id="numbered-tab" class="nav-button"><span>Missing books</span></button>
       </nav>
       <div class="sidebar-footer"><span class="signal"></span> <span id="access-label">Read-only access</span><p>Make changes in the Windows<br>or iPhone app.</p></div>
     </aside>
     <main id="main" tabindex="-1">
       <header class="topbar"><span class="eyebrow">PERSONAL ARCHIVES</span><div class="actions"><button id="refresh" class="quiet">↻ Refresh</button><button id="lock" class="quiet">Sign out</button></div></header>
       <div class="page-heading"><div><h1 id="section-title">Collection</h1><p id="section-description">Every edition. Every adventure. All in one place.</p></div><span class="pill">READ ONLY</span></div>
+      <p id="library-status" class="status" role="status" aria-live="polite"></p>
+      <section id="catalog-view" aria-label="Catalog">
       <div class="toolbar">
         <label class="search"><span class="sr-only">Search title, author, or ISBN</span><input id="search" type="search" placeholder="Search title, author, or ISBN…" autocomplete="off"></label>
         <button id="filter-toggle" class="quiet filter-toggle" aria-expanded="false" aria-controls="filters">Filters</button>
@@ -90,9 +93,24 @@
         <button id="clear" class="text-button">Reset filters</button>
       </div>
       <div class="result-summary"><p id="result-count" aria-live="polite"></p><p id="updated"></p></div>
-      <p id="library-status" class="status" role="status" aria-live="polite"></p>
       <div id="results" class="covers" aria-label="Books"></div>
       <div id="empty" class="empty" hidden><span aria-hidden="true">✧</span><h2 id="empty-title">No editions here yet.</h2><p id="empty-description"></p></div>
+      </section>
+      <section id="numbered-view" hidden aria-label="Missing books and story arcs">
+        <div class="numbered-controls">
+          <label class="missing-mode">View<select id="missing-view-mode"><option value="numbers">Numbered series</option><option value="arcs">Story arcs</option></select></label>
+          <label>Series<select id="numbered-series"></select></label>
+          <label>Format<select id="numbered-format"><option value="print">Print books</option><option value="">Any format</option></select></label>
+          <label>First number<input id="numbered-first" type="number" min="1" max="1000" step="1" value="1" inputmode="numeric"></label>
+          <label>Last number<input id="numbered-last" type="number" min="1" max="1000" step="1" value="63" inputmode="numeric"></label>
+        </div>
+        <p id="numbered-hint" class="hint">Print books counts paperbacks and hardcovers. Classic Pocket Books ranges are suggested; adjust for your numbering scheme. Only saved book numbers count; comics are excluded.</p>
+        <div class="numbered-actions"><label><input id="numbered-only-missing" type="checkbox" checked> <span id="numbered-only-label">Only missing numbers</span></label><label id="arc-started-label" hidden><input id="arc-started" type="checkbox" checked> Only sets I own in this format</label><button id="numbered-copy" class="quiet">Copy missing numbers</button></div>
+        <div id="numbered-summary" aria-live="polite"></div>
+        <p id="numbered-list" class="numbered-list"></p>
+        <div id="numbered-tiles" class="numbered-tiles"></div>
+        <details id="numbered-review"><summary id="numbered-review-title">Review incomplete numbering</summary><p class="hint">Fill in these numbers in the Windows or iPhone app, then refresh here. Leave unnumbered releases blank.</p><div id="numbered-review-list"></div></details>
+      </section>
       <footer class="page-footer"><span>STARFLEET LIBRARY</span><button id="forget" class="text-button">Forget this browser</button></footer>
     </main>
   </div>

@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['src/**', '.github/workflows/ios-sideload.yml', 'global.json', 'Directory.Build.props']
+    paths: ['src/**', 'cloudflare/public/story-arcs.json', '.github/workflows/ios-sideload.yml', 'global.json', 'Directory.Build.props']
 permissions:
   contents: read
 concurrency:

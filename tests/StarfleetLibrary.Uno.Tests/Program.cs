@@ -3,6 +3,7 @@ using StarfleetLibrary.Uno.Services;
 
 var tests = new (string Name, Func<string, Task> Run)[]
 {
+    ("ISBN lookup fills verified numbers and keeps optional failures harmless", _ => LookupChecks.Run()),
     ("First launch copies metadata and artwork without modifying MAUI", async root =>
     {
         var source = Path.Combine(root, "maui");

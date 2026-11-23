@@ -43,6 +43,9 @@ public sealed class ISBNLookup(HttpClient client)
                     cover = new UriBuilder(uri) { Scheme = "https", Port = -1 }.Uri.AbsoluteUri;
             }
             ct.ThrowIfCancellationRequested();
+            var reference = NumberedBooks.FindByIsbn(canonical);
+            var numbering = reference is not null ? (reference.Series, reference.Number) : await ReadNumberingAsync(canonical, deadline.Token);
+            ct.ThrowIfCancellationRequested();
             return new Book
             {
                 Title = title,
@@ -51,7 +54,8 @@ public sealed class ISBNLookup(HttpClient client)
                 Publisher = Names(entry, "publishers"),
                 PublicationYear = year,
                 PageCount = pages,
-                Series = InferSeries($"{title} {Text(entry, "subtitle")}"),
+                Series = numbering?.Item1 ?? InferSeries($"{title} {Text(entry, "subtitle")}"),
+                BookNumber = numbering?.Item2.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "",
                 CoverUrl = cover
             };
         }
@@ -63,6 +67,26 @@ public sealed class ISBNLookup(HttpClient client)
         {
             throw new InvalidOperationException("Open Library returned unreadable metadata. Enter the edition manually or try again.", ex);
         }
+    }
+
+    private async Task<(TrekSeries, int)?> ReadNumberingAsync(string isbn, CancellationToken ct)
+    {
+        // Optional edition metadata must not discard a successful title/author lookup.
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(4));
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"https://openlibrary.org/isbn/{isbn}.json");
+            request.Headers.UserAgent.ParseAdd("StarfleetLibrary/1.0");
+            using var response = await client.SendAsync(request, timeout.Token);
+            if (!response.IsSuccessStatusCode) return null;
+            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(timeout.Token));
+            if (json.RootElement.ValueKind != JsonValueKind.Object || !json.RootElement.TryGetProperty("series", out var values)) return null;
+            var series = values.ValueKind == JsonValueKind.String ? new[] { values.GetString()! } :
+                values.ValueKind == JsonValueKind.Array ? values.EnumerateArray().Where(value => value.ValueKind == JsonValueKind.String).Select(value => value.GetString()!).ToArray() : [];
+            return NumberedBooks.FromSeriesMetadata(series);
+        }
+        catch (Exception error) when (error is HttpRequestException or JsonException or OperationCanceledException) { return null; }
     }
 
     private static string Text(JsonElement value, string property) =>

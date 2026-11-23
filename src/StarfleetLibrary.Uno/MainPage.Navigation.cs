@@ -55,6 +55,7 @@ public sealed partial class MainPage
             Body.Children.Clear();
             ShowInsights();
         }
+        else if (section == "Missing books") RefreshNumberedBooks();
         else RefreshResults();
         Responsive();
         RestoreBodyScroll(offsets);

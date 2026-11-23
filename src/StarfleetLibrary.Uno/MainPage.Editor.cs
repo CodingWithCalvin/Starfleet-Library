@@ -32,7 +32,7 @@ public sealed partial class MainPage
         var feedback = new InfoBar { IsOpen = false, IsClosable = false };
         form.Children.Add(Text(isNew ? "Make room for a new adventure." : "Update this edition and its reading log.", 14));
         form.Children.Add(feedback);
-        form.Children.Add(title); form.Children.Add(authors);
+        form.Children.Add(isbn);
         var lookupButton = ActionButton("Fill details from ISBN", (_, _) => { });
         lookupButton.Click += async (_, _) =>
         {
@@ -43,14 +43,19 @@ public sealed partial class MainPage
                 title.Text = found.Title; authors.Text = found.Authors; publisher.Text = found.Publisher;
                 year.Text = found.PublicationYear; pages.Value = found.PageCount; cover.Text = found.CoverUrl ?? "";
                 isbn.Text = found.Isbn; series.SelectedIndex = Array.IndexOf(seriesValues, found.Series);
-                feedback.Severity = InfoBarSeverity.Informational; feedback.Message = "Metadata filled from Open Library. Review the title, series and format before saving."; feedback.IsOpen = true;
+                if (found.BookNumber.Length > 0) number.Text = found.BookNumber;
+                feedback.Severity = InfoBarSeverity.Informational;
+                feedback.Message = found.BookNumber.Length > 0 ? $"Found {found.Series.ShortName()} #{found.BookNumber}. Review the edition before saving." : "Metadata filled. No reliable book number was found; enter it from the cover if this is a numbered book.";
+                feedback.IsOpen = true;
             }
             catch (Exception ex) { feedback.Severity = InfoBarSeverity.Error; feedback.Message = ex.Message; feedback.IsOpen = true; }
             finally { lookupButton.IsEnabled = true; }
         };
-        form.Children.Add(Pair(isbn, year)); form.Children.Add(lookupButton);
+        form.Children.Add(lookupButton);
+        form.Children.Add(title); form.Children.Add(authors);
+        form.Children.Add(Pair(year, number));
         form.Children.Add(Pair(series, kind)); form.Children.Add(Pair(format, ownership));
-        form.Children.Add(Pair(publisher, edition)); form.Children.Add(number);
+        form.Children.Add(Pair(publisher, edition));
         form.Children.Add(Text("Reading log", 20, "#17243B", true));
         form.Children.Add(Pair(status, rating)); form.Children.Add(Pair(pages, current)); form.Children.Add(finished);
         var clearDate = ActionButton("Clear finished date", (_, _) => finished.Date = null); form.Children.Add(clearDate);

@@ -2,6 +2,29 @@ export const seriesNames = ['The Original Series', 'The Next Generation', 'Deep 
 export const seriesCodes = ['TOS', 'TNG', 'DS9', 'VOY', 'ENT', 'DIS', 'PIC', 'OTHER', 'SNW'];
 export const formats = ['Paperback', 'Hardcover', 'E-book', 'Audiobook'];
 export const readingStates = ['Unread', 'Reading', 'Finished'];
+export function parseBookNumber(value) {
+  const text = String(value ?? '').trim().replace(/^#\s*/, '');
+  const number = Number(text);
+  return /^[0-9]+$/.test(text) && Number.isInteger(number) && number >= 1 && number <= 1000 ? number : null;
+}
+export function suggestedNumberEnd(entries, series) {
+  return Math.max([97, 63, 27, 21][series] ?? 0, ...entries.filter(({book}) => book.series === series && (book.kind ?? 0) === 0).map(({book}) => parseBookNumber(book.bookNumber) ?? 0));
+}
+export function numberedReport(entries, series, format, first, last, physicalOnly = false) {
+  if (!Number.isInteger(first) || !Number.isInteger(last) || first < 1 || last < first || last > 1000) throw new RangeError('Choose a whole-number range between 1 and 1000.');
+  const selected = entries.filter(({book}) => book.series === series && (book.kind ?? 0) === 0);
+  const inFormat = ({book}) => (format == null || book.format === format) && (!physicalOnly || book.format === 0 || book.format === 1);
+  const owned = selected.filter(entry => entry.book.ownership === 0 && inFormat(entry));
+  const slots = Array.from({length: last - first + 1}, (_, index) => {
+    const number = first + index;
+    const matches = selected.filter(({book}) => parseBookNumber(book.bookNumber) === number);
+    const copies = matches.filter(entry => entry.book.ownership === 0 && inFormat(entry));
+    const wishlist = matches.filter(entry => entry.book.ownership === 1 && inFormat(entry));
+    const otherFormats = matches.filter(entry => entry.book.ownership === 0 && !inFormat(entry));
+    return {number, owned: copies, wishlist, otherFormats, missing: copies.length === 0, status: copies.length ? 'Owned' : wishlist.length ? 'On wishlist' : 'Missing'};
+  });
+  return {slots, needsNumber: owned.filter(({book}) => parseBookNumber(book.bookNumber) == null), outsideRange: owned.filter(({book}) => {const number = parseBookNumber(book.bookNumber); return number != null && (number < first || number > last);})};
+}
 export const catalogLabel = book => [book.kind === 1 ? 'COMIC' : '', seriesCodes[book.series] ?? 'OTHER'].filter(Boolean).join(' · ');
 const collator = new Intl.Collator(undefined, {numeric: true, sensitivity: 'base'});
 const normalize = value => String(value ?? '').normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase();
